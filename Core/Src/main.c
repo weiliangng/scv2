@@ -163,6 +163,14 @@ int main(void)
   {
     Error_Handler();
   }
+  if (HAL_OPAMP_Start(&hopamp2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_OPAMP_Start(&hopamp3) != HAL_OK)
+  {
+    Error_Handler();
+  }
   if (HAL_COMP_Start(&hcomp4) != HAL_OK)
   {
     Error_Handler();
