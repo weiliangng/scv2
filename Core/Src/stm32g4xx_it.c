@@ -22,6 +22,9 @@
 #include "stm32g4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "stm32g4xx_ll_dac.h"
+#include "stm32g4xx_ll_dma.h"
+#include "stm32g4xx_ll_gpio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,6 +54,31 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+extern volatile uint16_t g_adc1_dma_buf[2];
+extern volatile uint16_t g_adc2_dma_buf[3];
+
+static inline uint16_t clamp_u12(int32_t v)
+{
+  if (v < 0)
+  {
+    return 0;
+  }
+  if (v > 4095)
+  {
+    return 4095;
+  }
+  return (uint16_t)v;
+}
+
+static inline int16_t sign_extend12(uint16_t v)
+{
+  v &= 0x0FFFU;
+  if ((v & 0x0800U) != 0U)
+  {
+    v |= 0xF000U;
+  }
+  return (int16_t)v;
+}
 
 /* USER CODE END 0 */
 
@@ -170,7 +198,27 @@ void DMA1_Channel1_IRQHandler(void)
   /* USER CODE BEGIN DMA1_Channel1_IRQn 0 */
 
   /* USER CODE END DMA1_Channel1_IRQn 0 */
-  HAL_DMA_IRQHandler(&hdma_adc1);
+  if (LL_DMA_IsActiveFlag_TC1(DMA1) != 0U)
+  {
+    LL_DMA_ClearFlag_GI1(DMA1);
+
+    LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_4);
+
+    const uint16_t a1 = g_adc1_dma_buf[0];
+    const uint16_t a2 = g_adc1_dma_buf[1];
+    const int16_t b1 = sign_extend12(g_adc2_dma_buf[0]);
+    const uint16_t b2 = g_adc2_dma_buf[1];
+    const uint16_t b3 = g_adc2_dma_buf[2];
+
+    const uint16_t out1 = (uint16_t)((a1 + a2 + b2 + b3) >> 2);
+    const uint16_t out2 = clamp_u12((int32_t)2048 + (int32_t)b1);
+
+    LL_DAC_ConvertDualData12RightAligned(DAC1, b2, b3);
+  }
+  else
+  {
+    LL_DMA_ClearFlag_GI1(DMA1);
+  }
   /* USER CODE BEGIN DMA1_Channel1_IRQn 1 */
 
   /* USER CODE END DMA1_Channel1_IRQn 1 */
@@ -184,7 +232,7 @@ void DMA1_Channel2_IRQHandler(void)
   /* USER CODE BEGIN DMA1_Channel2_IRQn 0 */
 
   /* USER CODE END DMA1_Channel2_IRQn 0 */
-  HAL_DMA_IRQHandler(&hdma_adc2);
+  LL_DMA_ClearFlag_GI2(DMA1);
   /* USER CODE BEGIN DMA1_Channel2_IRQn 1 */
 
   /* USER CODE END DMA1_Channel2_IRQn 1 */
