@@ -70,14 +70,17 @@ static inline uint16_t clamp_u12(int32_t v)
   return (uint16_t)v;
 }
 
-static inline int16_t sign_extend12(uint16_t v)
+/*
+ * STM32G4 ADC differential mode returns a 12-bit "offset binary" result:
+ * - ~0x800 corresponds to ~0 Vdiff (VIN+ - VIN-)
+ * - below 0x800 is negative Vdiff
+ * - above 0x800 is positive Vdiff
+ *
+ * Convert a right-aligned 12-bit sample to signed counts in [-2048, +2047].
+ */
+static inline int16_t adc12_offset_binary_to_i12(uint16_t v)
 {
-  v &= 0x0FFFU;
-  if ((v & 0x0800U) != 0U)
-  {
-    v |= 0xF000U;
-  }
-  return (int16_t)v;
+  return (int16_t)((int32_t)(v & 0x0FFFU) - 2048);
 }
 
 /* USER CODE END 0 */
@@ -206,14 +209,20 @@ void DMA1_Channel1_IRQHandler(void)
 
     const uint16_t a1 = g_adc1_dma_buf[0];
     const uint16_t a2 = g_adc1_dma_buf[1];
-    const int16_t b1 = sign_extend12(g_adc2_dma_buf[0]);
+    const uint16_t b1_raw12 = g_adc2_dma_buf[0] & 0x0FFFU;
+    const int16_t b1 = adc12_offset_binary_to_i12(b1_raw12);
     const uint16_t b2 = g_adc2_dma_buf[1];
     const uint16_t b3 = g_adc2_dma_buf[2];
 
-    const uint16_t out1 = (uint16_t)((a1 + a2 + b2 + b3) >> 2);
+    const uint16_t out1 = (uint16_t)((a1 + a2 + b2 + b3) >> 2);//
+    /*
+     * For a differential signal spanning approximately -Vref..+Vref, the ADC
+     * already produces 0..4095 (offset at ~2048). That directly matches the
+     * DAC's 0..Vref output range (1.65 V at code ~2048 for Vref=3.3 V).
+     */
     const uint16_t out2 = clamp_u12((int32_t)2048 + (int32_t)b1);
 
-    LL_DAC_ConvertDualData12RightAligned(DAC1, b2, b3);
+    LL_DAC_ConvertDualData12RightAligned(DAC1, out2, out2);
   }
   else
   {

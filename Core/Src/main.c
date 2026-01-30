@@ -175,14 +175,6 @@ int main(void)
   {
     Error_Handler();
   }
-  if (HAL_TIM_Base_Start(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
 
   if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
   {
@@ -210,6 +202,15 @@ int main(void)
     Error_Handler();
   }
   __HAL_DMA_DISABLE_IT(&hdma_adc1, DMA_IT_HT);
+
+  if (HAL_TIM_Base_Start(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
   /* USER CODE END 2 */
 
