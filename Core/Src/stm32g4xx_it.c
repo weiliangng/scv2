@@ -226,6 +226,7 @@ void DMA1_Channel1_IRQHandler(void)
   {
     LL_DMA_ClearFlag_GI1(DMA1);
   }
+  return;
   /* USER CODE END DMA1_Channel1_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_adc1);
   /* USER CODE BEGIN DMA1_Channel1_IRQn 1 */
@@ -240,6 +241,7 @@ void DMA1_Channel2_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Channel2_IRQn 0 */
   LL_DMA_ClearFlag_GI2(DMA1);
+  return;
   /* USER CODE END DMA1_Channel2_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_adc2);
   /* USER CODE BEGIN DMA1_Channel2_IRQn 1 */
