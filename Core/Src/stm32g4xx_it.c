@@ -205,22 +205,21 @@ void DMA1_Channel1_IRQHandler(void)
 
     LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_4);
 
+    //Vin/Vout
     const uint16_t a1 = g_adc1_dma_buf[0];
     const uint16_t a2 = g_adc1_dma_buf[1];
+
+    //map -3.3 - 3.3V to 0-3.3V
     const uint16_t b1_raw12 = g_adc2_dma_buf[0] & 0x0FFFU;
     const int16_t b1 = adc12_offset_binary_to_i12(b1_raw12);
+    const uint16_t out2 = clamp_u12((int32_t)2048 + (int32_t)b1);
+
+    //pga gain of 2 for imonon/op
     const uint16_t b2 = g_adc2_dma_buf[1];
     const uint16_t b3 = g_adc2_dma_buf[2];
 
-    const uint16_t out1 = (uint16_t)((a1 + a2 + b2 + b3) >> 2);//
-    /*
-     * For a differential signal spanning approximately -Vref..+Vref, the ADC
-     * already produces 0..4095 (offset at ~2048). That directly matches the
-     * DAC's 0..Vref output range (1.65 V at code ~2048 for Vref=3.3 V).
-     */
-    const uint16_t out2 = clamp_u12((int32_t)2048 + (int32_t)b1);
-
-    LL_DAC_ConvertDualData12RightAligned(DAC1, out2, out2);
+    LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_1, out2);
+    LL_DAC_ConvertDualData12RightAligned(DAC1, b2, b3);//choose any a1,a2,b2,b3
   }
   else
   {

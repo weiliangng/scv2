@@ -1008,7 +1008,9 @@ void StartDefaultTask(void const * argument)
   /* init code for USB_Device */
   MX_USB_Device_Init();
   /* USER CODE BEGIN 5 */
-  (void)argument;
+  /* 12-bit DAC values for ~1.0V and ~3.0V with Vref = 3.3V */
+  const uint32_t dac_val_low = 1241;
+  const uint32_t dac_val_high = 3723;
   static uint32_t hello_seq = 0U;
   char msg[64];
   /* Infinite loop */
@@ -1017,7 +1019,12 @@ void StartDefaultTask(void const * argument)
     int len = snprintf(msg, sizeof(msg), "id=%lu \r\n",
                        (unsigned long)hello_seq++);
     dbg_write((const uint8_t *)msg, (uint16_t)len);
-    osDelay(10);
+
+    HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_2, DAC_ALIGN_12B_R, dac_val_low);
+    osDelay(5);
+
+    HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_2, DAC_ALIGN_12B_R, dac_val_high);
+    osDelay(5);
   }
   /* USER CODE END 5 */
 }
