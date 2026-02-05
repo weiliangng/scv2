@@ -25,6 +25,8 @@
 #include "stm32g4xx_ll_dac.h"
 #include "stm32g4xx_ll_dma.h"
 #include "stm32g4xx_ll_gpio.h"
+#include "app_constants.h"
+#include "inv_adc_lut.h"
 #include "shared_state.h"
 /* USER CODE END Includes */
 
@@ -66,19 +68,6 @@ static inline uint16_t clamp_u12(int32_t v)
     return 4095;
   }
   return (uint16_t)v;
-}
-
-/*
- * STM32G4 ADC differential mode returns a 12-bit "offset binary" result:
- * - ~0x800 corresponds to ~0 Vdiff (VIN+ - VIN-)
- * - below 0x800 is negative Vdiff
- * - above 0x800 is positive Vdiff
- *
- * Convert a right-aligned 12-bit sample to signed counts in [-2048, +2047].
- */
-static inline int16_t adc12_offset_binary_to_i12(uint16_t v)
-{
-  return (int16_t)((int32_t)(v & 0x0FFFU) - 2048);
 }
 
 /* USER CODE END 0 */
@@ -204,20 +193,31 @@ void DMA1_Channel1_IRQHandler(void)
     LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_4);
 
     // ADC1 (see `shared_state.h`): [0]=Vcap, [1]=Vbus
-    const uint16_t a1 = g_adc1_dma_buf[0];
-    const uint16_t a2 = g_adc1_dma_buf[1];
+    const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
+    const uint16_t n_adc_vbus = g_adc1_dma_buf[1] & 0x0FFFU;
 
     // ADC2 (see `shared_state.h`): [0]=ILOAD differential (offset-binary)
-    const uint16_t b1_raw12 = g_adc2_dma_buf[0] & 0x0FFFU;
-    const int16_t b1 = adc12_offset_binary_to_i12(b1_raw12);
-    const uint16_t out2 = clamp_u12((int32_t)2048 + (int32_t)b1);
+    const uint16_t n_adc_iload = g_adc2_dma_buf[0] & 0x0FFFU;
 
-    //pga gain of 2 for imonon/op
-    const uint16_t b2 = g_adc2_dma_buf[1];
-    const uint16_t b3 = g_adc2_dma_buf[2];
+    const float v_bus = (A_VBUS * (float)n_adc_vbus) + B_VBUS;
+    const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
+    const float i_load = (A_ILOAD * (float)n_adc_iload) + B_ILOAD;
 
-    LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_1, out2);
-    LL_DAC_ConvertDualData12RightAligned(DAC1, b2, b3);//choose any a1,a2,b2,b3
+    const float p_set = g_can_rx.p_set_cmd;
+    const float inv_v_bus = A_VBUS_INV * InvAdc_LookupClampedI32((int32_t)((float)n_adc_vbus + N_OFFSET));
+    const float i_conv = (p_set * inv_v_bus) - i_load;
+
+    const uint16_t n_dac_p = clamp_u12((int32_t)(A_INP + (i_conv * B_INP)));
+    const uint16_t n_dac_n = clamp_u12((int32_t)(A_INN + (i_conv * B_INN)));
+
+    g_latest.v_bus = v_bus;
+    g_latest.v_cap = v_cap;
+    g_latest.i_load = i_load;
+    g_latest.i_out = i_conv;
+
+    // Optional: mirror ILOAD ADC counts on DAC3_CH1 for scope/debug.
+    LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_1, n_adc_iload);
+    LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_p, n_dac_n);
   }
   else
   {
