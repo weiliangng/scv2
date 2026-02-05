@@ -25,6 +25,7 @@
 #include "stm32g4xx_ll_dac.h"
 #include "stm32g4xx_ll_dma.h"
 #include "stm32g4xx_ll_gpio.h"
+#include "shared_state.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,9 +55,6 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-extern volatile uint16_t g_adc1_dma_buf[2];
-extern volatile uint16_t g_adc2_dma_buf[3];
-
 static inline uint16_t clamp_u12(int32_t v)
 {
   if (v < 0)

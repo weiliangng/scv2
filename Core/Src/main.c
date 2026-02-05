@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "task_dbg_over_usb.h"
+#include "shared_state.h"
 
 /* USER CODE END Includes */
 
@@ -67,8 +68,6 @@ UART_HandleTypeDef huart3;
 
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
-volatile uint16_t g_adc1_dma_buf[2];
-volatile uint16_t g_adc2_dma_buf[3];
 
 /* USER CODE END PV */
 

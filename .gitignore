@@ -1,0 +1,7 @@
+# CMake out-of-tree builds
+build/
+cmake-build-*/
+
+# IDE
+.idea/
+
