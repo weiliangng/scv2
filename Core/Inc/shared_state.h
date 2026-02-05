@@ -29,6 +29,17 @@ extern volatile latest_values_t g_latest;
 /*
  * ADC DMA buffers updated by hardware/DMA and consumed in ISR/task contexts.
  */
+/*
+ * DMA order follows the ADC "Rank" order in `test.ioc`:
+ * ADC1 (2 conversions):
+ *   g_adc1_dma_buf[0] = Vcap   (PA0 / ADC1_IN1 / ADC_CHANNEL_1)
+ *   g_adc1_dma_buf[1] = Vbus   (PA1 / ADC1_IN2 / ADC_CHANNEL_2)
+ *
+ * ADC2 (3 conversions):
+ *   g_adc2_dma_buf[0] = ILOAD  (PA6=IN3+, PA7=IN4- / ADC2_IN3..IN4 differential / ADC_CHANNEL_3)
+ *   g_adc2_dma_buf[1] = IMONOP (PB14 -> OPAMP2 PGA -> ADC2 VOPAMP2)
+ *   g_adc2_dma_buf[2] = IMONON (PB13 -> OPAMP3 PGA -> ADC2 VOPAMP3_ADC2)
+ */
 extern volatile uint16_t g_adc1_dma_buf[2];
 extern volatile uint16_t g_adc2_dma_buf[3];
 
@@ -62,4 +73,3 @@ typedef struct
 extern volatile uart_rx_state_t g_uart_rx;
 
 #endif /* SHARED_STATE_H */
-

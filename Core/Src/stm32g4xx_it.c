@@ -203,11 +203,11 @@ void DMA1_Channel1_IRQHandler(void)
 
     LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_4);
 
-    //Vin/Vout
+    // ADC1 (see `shared_state.h`): [0]=Vcap, [1]=Vbus
     const uint16_t a1 = g_adc1_dma_buf[0];
     const uint16_t a2 = g_adc1_dma_buf[1];
 
-    //map -3.3 - 3.3V to 0-3.3V
+    // ADC2 (see `shared_state.h`): [0]=ILOAD differential (offset-binary)
     const uint16_t b1_raw12 = g_adc2_dma_buf[0] & 0x0FFFU;
     const int16_t b1 = adc12_offset_binary_to_i12(b1_raw12);
     const uint16_t out2 = clamp_u12((int32_t)2048 + (int32_t)b1);
