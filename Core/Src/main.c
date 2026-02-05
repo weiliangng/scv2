@@ -25,6 +25,7 @@
 /* USER CODE BEGIN Includes */
 #include "task_dbg_over_usb.h"
 #include "shared_state.h"
+#include "inv_adc_lut.h"
 
 /* USER CODE END Includes */
 
@@ -141,6 +142,7 @@ int main(void)
   MX_TIM2_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
+  InvAdc_Init();
   DbgUsb_Init();
   if (HAL_DAC_Start(&hdac1, DAC_CHANNEL_1) != HAL_OK)
   {
