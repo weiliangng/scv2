@@ -13,3 +13,5 @@ volatile can_rx_state_t g_can_rx = {
     .p_set_cmd = 50.0f,
 };
 volatile uart_rx_state_t g_uart_rx;
+
+volatile bool g_control_automatic = true;

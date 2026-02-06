@@ -80,4 +80,11 @@ typedef struct
 
 extern volatile uart_rx_state_t g_uart_rx;
 
+/*
+ * Control mode:
+ * - Automatic: fast DMA ISR drives DAC + control GPIOs
+ * - Manual: DMA ISR computes/updates telemetry only; hardware writes are gated off
+ */
+extern volatile bool g_control_automatic;
+
 #endif /* SHARED_STATE_H */
