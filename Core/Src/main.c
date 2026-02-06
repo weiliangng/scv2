@@ -73,7 +73,7 @@ osThreadId defaultTaskHandle;
 uint32_t defaultTaskBuffer[ 128 ];
 osStaticThreadDef_t defaultTaskControlBlock;
 osThreadId usbCDCTxTaskHandle;
-uint32_t usbCDCTxTaskBuffer[ 512 ];
+uint32_t usbCDCTxTaskBuffer[ 256 ];
 osStaticThreadDef_t usbCDCTxTaskControlBlock;
 osThreadId telemetryTaskHandle;
 uint32_t telemetryTaskBuffer[ 512 ];
@@ -256,7 +256,7 @@ int main(void)
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of usbCDCTxTask */
-  osThreadStaticDef(usbCDCTxTask, StartUsbCDCTxTask, osPriorityNormal, 0, 512, usbCDCTxTaskBuffer, &usbCDCTxTaskControlBlock);
+  osThreadStaticDef(usbCDCTxTask, StartUsbCDCTxTask, osPriorityNormal, 0, 256, usbCDCTxTaskBuffer, &usbCDCTxTaskControlBlock);
   usbCDCTxTaskHandle = osThreadCreate(osThread(usbCDCTxTask), NULL);
 
   /* definition and creation of telemetryTask */

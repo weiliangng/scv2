@@ -35,7 +35,7 @@
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern void Error_Handler(void);
 
-#define DBG_TX_BUF_SIZE 1024U
+#define DBG_TX_BUF_SIZE 256U
 #define DBG_TX_CHUNK_SIZE 64U
 
 static StreamBufferHandle_t dbg_stream = NULL;
