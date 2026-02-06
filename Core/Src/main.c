@@ -26,6 +26,7 @@
 #include <stdio.h>
 
 #include "task_dbg_over_usb.h"
+#include "app_constants.h"
 #include "shared_state.h"
 
 /* USER CODE END Includes */
@@ -77,6 +78,9 @@ osStaticThreadDef_t usbCDCTxTaskControlBlock;
 osThreadId telemetryTaskHandle;
 uint32_t telemetryTaskBuffer[ 512 ];
 osStaticThreadDef_t telemetryTaskControlBlock;
+osThreadId slowAdcTaskHandle;
+uint32_t myTask04Buffer[ 128 ];
+osStaticThreadDef_t myTask04ControlBlock;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -100,6 +104,7 @@ static void MX_USART3_UART_Init(void);
 void StartDefaultTask(void const * argument);
 void StartUsbCDCTxTask(void const * argument);
 void StartTelemetryTask(void const * argument);
+void StartSlowAdcTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -260,6 +265,10 @@ int main(void)
   /* definition and creation of telemetryTask */
   osThreadStaticDef(telemetryTask, StartTelemetryTask, osPriorityNormal, 0, 512, telemetryTaskBuffer, &telemetryTaskControlBlock);
   telemetryTaskHandle = osThreadCreate(osThread(telemetryTask), NULL);
+
+  /* definition and creation of slowAdcTask */
+  osThreadStaticDef(slowAdcTask, StartSlowAdcTask, osPriorityLow, 0, 128, myTask04Buffer, &myTask04ControlBlock);
+  slowAdcTaskHandle = osThreadCreate(osThread(slowAdcTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -1088,25 +1097,37 @@ void StartTelemetryTask(void const * argument)
   /* USER CODE BEGIN StartTelemetryTask */
   /* Infinite loop */
   static uint32_t hello_seq = 0U;
-  char msg[128];
+  char msg[256];
   for(;;)
   {
     const float v_bus = g_latest.v_bus;
+    const float v_cap = g_latest.v_cap;
     const float i_load = g_latest.i_load;
+    const float i_out_p = g_latest.i_out_p;
+    const float i_out_n = g_latest.i_out_n;
+    const float i_out = g_latest.i_out;
     const float i_conv = g_latest.i_conv;
 
     const int32_t v_bus_mV = (int32_t)(v_bus * 1000.0f);
+    const int32_t v_cap_mV = (int32_t)(v_cap * 1000.0f);
     const int32_t i_load_mA = (int32_t)(i_load * 1000.0f);
+    const int32_t i_out_p_mA = (int32_t)(i_out_p * 1000.0f);
+    const int32_t i_out_n_mA = (int32_t)(i_out_n * 1000.0f);
+    const int32_t i_out_mA = (int32_t)(i_out * 1000.0f);
     const int32_t i_conv_mA = (int32_t)(i_conv * 1000.0f);
 
     const uint32_t dma1_ch1_cycles_last = g_dma1_ch1_irq_cycles_last;
     const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu v_bus_mV=%ld i_load_mA=%ld i_conv_mA=%ld last=%lu max=%lu\r\n",
+                       "id=%lu v_bus_mV=%ld v_cap_mV=%ld i_load_mA=%ld i_out_p_mA=%ld i_out_n_mA=%ld i_out_mA=%ld i_conv_mA=%ld last=%lu max=%lu\r\n",
                        (unsigned long)hello_seq++,
                        (long)v_bus_mV,
+                       (long)v_cap_mV,
                        (long)i_load_mA,
+                       (long)i_out_p_mA,
+                       (long)i_out_n_mA,
+                       (long)i_out_mA,
                        (long)i_conv_mA,
                        (unsigned long)dma1_ch1_cycles_last,
                        (unsigned long)dma1_ch1_cycles_max);
@@ -1114,6 +1135,40 @@ void StartTelemetryTask(void const * argument)
     osDelay(10);
   }
   /* USER CODE END StartTelemetryTask */
+}
+
+/* USER CODE BEGIN Header_StartSlowAdcTask */
+/**
+* @brief Function implementing the slowAdcTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartSlowAdcTask */
+void StartSlowAdcTask(void const * argument)
+{
+  /* USER CODE BEGIN StartSlowAdcTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
+    const uint16_t n_adc_imonop = g_adc2_dma_buf[1] & 0x0FFFU;
+    const uint16_t n_adc_imonon = g_adc2_dma_buf[2] & 0x0FFFU;
+
+    const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
+
+    const float i_out_p = (A_OP * (float)n_adc_imonop) + B_OP;
+    const float i_out_n = (A_ON * (float)n_adc_imonon) + B_ON;
+
+    const float i_out = (i_out_p > -i_out_n) ? i_out_p : i_out_n;
+
+    g_latest.v_cap = v_cap;
+    g_latest.i_out_p = i_out_p;
+    g_latest.i_out_n = i_out_n;
+    g_latest.i_out = i_out;
+
+    osDelay(1);
+  }
+  /* USER CODE END StartSlowAdcTask */
 }
 
 /**

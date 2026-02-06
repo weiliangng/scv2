@@ -193,14 +193,12 @@ void DMA1_Channel1_IRQHandler(void)
     //LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_4);
 
     // ADC1 (see `shared_state.h`): [0]=Vcap, [1]=Vbus
-    //const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
     const uint16_t n_adc_vbus = g_adc1_dma_buf[1] & 0x0FFFU;
 
     // ADC2 (see `shared_state.h`): [0]=ILOAD differential (offset-binary)
     const uint16_t n_adc_iload = g_adc2_dma_buf[0] & 0x0FFFU;
 
     const float v_bus = (A_VBUS * (float)n_adc_vbus) + B_VBUS;
-    //const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
     const float i_load = (A_ILOAD * (float)n_adc_iload) + B_ILOAD;
 
     const float p_set = g_can_rx.p_set_cmd;
@@ -213,7 +211,6 @@ void DMA1_Channel1_IRQHandler(void)
     const uint16_t n_dac_n = clamp_u12((int32_t)(A_INN + (i_conv * B_INN)));
 
     g_latest.v_bus = v_bus;
-    //g_latest.v_cap = v_cap;
     g_latest.i_load = i_load;
     g_latest.i_conv = i_conv;
 

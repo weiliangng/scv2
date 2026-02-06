@@ -17,6 +17,7 @@ typedef struct
   float v_bus;
   float v_cap;
   float i_load;
+  float i_out;
   float i_out_p;
   float i_out_n;
   float i_conv;
