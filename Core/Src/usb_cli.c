@@ -36,10 +36,17 @@ static uint8_t usbcli_in_isr(void)
 
 static void usbcli_put_char(void *data, char ch, bool is_last)
 {
+  static uint8_t out_buf[64];
+  static uint16_t out_len = 0U;
+
   (void)data;
-  (void)is_last;
-  const uint8_t b = (uint8_t)ch;
-  dbg_write(&b, 1U);
+
+  out_buf[out_len++] = (uint8_t)ch;
+  if ((out_len >= (uint16_t)sizeof(out_buf)) || (is_last != false))
+  {
+    dbg_write(out_buf, out_len);
+    out_len = 0U;
+  }
 }
 
 static int usbcli_printf(const char *fmt, ...)

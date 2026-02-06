@@ -36,10 +36,9 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 extern void Error_Handler(void);
 
 #define DBG_TX_BUF_SIZE 2048U
-#define DBG_TX_CHUNK_SIZE 64U
+#define DBG_TX_CHUNK_SIZE 512U
 
-#define EV_TX_KICK (1UL << 0)
-#define EV_TX_DONE (1UL << 1)
+#define EV_TX_DONE (1UL << 0)
 
 static StreamBufferHandle_t dbg_stream = NULL;
 static StaticStreamBuffer_t dbg_stream_struct;
@@ -53,8 +52,6 @@ static volatile uint32_t dbg_drop_count = 0U;
 static uint8_t cdc_tx_ready(void);
 static uint8_t dbg_in_isr(void);
 static void dbg_write_bytes(const uint8_t *data, uint16_t len);
-static void dbg_kick_tx_task_from_isr(BaseType_t *hpw);
-static void dbg_kick_tx_task(void);
 
 void DbgUsb_Init(void)
 {
@@ -82,22 +79,6 @@ static uint8_t dbg_in_isr(void)
   return (__get_IPSR() != 0U) ? 1U : 0U;
 }
 
-static void dbg_kick_tx_task_from_isr(BaseType_t *hpw)
-{
-  if (dbg_tx_task_handle != NULL)
-  {
-    (void)xTaskNotifyFromISR(dbg_tx_task_handle, EV_TX_KICK, eSetBits, hpw);
-  }
-}
-
-static void dbg_kick_tx_task(void)
-{
-  if (dbg_tx_task_handle != NULL)
-  {
-    (void)xTaskNotify(dbg_tx_task_handle, EV_TX_KICK, eSetBits);
-  }
-}
-
 static void dbg_write_bytes(const uint8_t *data, uint16_t len)
 {
   uint8_t in_isr = dbg_in_isr();
@@ -118,7 +99,6 @@ static void dbg_write_bytes(const uint8_t *data, uint16_t len)
   if (in_isr != 0U)
   {
     sent = xStreamBufferSendFromISR(dbg_stream, data, len, &hpw);
-    dbg_kick_tx_task_from_isr(&hpw);
     if (hpw != pdFALSE)
     {
       portYIELD_FROM_ISR(hpw);
@@ -127,7 +107,6 @@ static void dbg_write_bytes(const uint8_t *data, uint16_t len)
   else
   {
     sent = xStreamBufferSend(dbg_stream, data, len, 0U);
-    dbg_kick_tx_task();
   }
   if (sent < len)
   {
@@ -179,7 +158,10 @@ void DbgUsb_OnTxCompleteFromISR(void)
   if (dbg_tx_task_handle != NULL)
   {
     (void)xTaskNotifyFromISR(dbg_tx_task_handle, EV_TX_DONE, eSetBits, &hpw);
-    portYIELD_FROM_ISR(hpw);
+    if (hpw != pdFALSE)
+    {
+      portYIELD_FROM_ISR(hpw);
+    }
   }
 }
 
@@ -212,46 +194,36 @@ void DbgUsb_TxTask(void const * argument)
 
     was_configured = 1U;
 
-    if ((tx_in_flight == 0U) && (tx_len == 0U))
+    if (tx_in_flight != 0U)
     {
       uint32_t ev = 0U;
-      (void)xTaskNotifyWait(0U, 0xFFFFFFFFUL, &ev, pdMS_TO_TICKS(200));
-      tx_len = (uint16_t)xStreamBufferReceive(dbg_stream, tx_chunk, sizeof(tx_chunk), pdMS_TO_TICKS(10));
+      (void)xTaskNotifyWait(0U, 0xFFFFFFFFUL, &ev, pdMS_TO_TICKS(50));
+      if (((ev & EV_TX_DONE) != 0U) || (cdc_tx_ready() != 0U))
+      {
+        tx_in_flight = 0U;
+        tx_len = 0U;
+      }
+      continue;
+    }
+
+    if (tx_len == 0U)
+    {
+      tx_len = (uint16_t)xStreamBufferReceive(dbg_stream, tx_chunk, sizeof(tx_chunk), pdMS_TO_TICKS(200));
       if (tx_len == 0U)
       {
         continue;
       }
     }
 
-    if ((tx_in_flight == 0U) && (tx_len > 0U))
+    if (CDC_Transmit_FS(tx_chunk, tx_len) == USBD_OK)
     {
-      const uint8_t r = CDC_Transmit_FS(tx_chunk, tx_len);
-      if (r == USBD_OK)
-      {
-        tx_in_flight = 1U;
-      }
-      else
-      {
-        uint32_t ev = 0U;
-        (void)xTaskNotifyWait(0U, 0xFFFFFFFFUL, &ev, pdMS_TO_TICKS(5));
-      }
+      tx_in_flight = 1U;
     }
-
-    if (tx_in_flight != 0U)
+    else
     {
+      /* Busy: wait a bit for the ongoing transfer to complete, then retry. */
       uint32_t ev = 0U;
-      (void)xTaskNotifyWait(0U, 0xFFFFFFFFUL, &ev, pdMS_TO_TICKS(200));
-      if ((ev & EV_TX_DONE) != 0U)
-      {
-        tx_in_flight = 0U;
-        tx_len = 0U;
-      }
-      else if (cdc_tx_ready() != 0U)
-      {
-        /* Fallback: recover if a TX-done notify is missed. */
-        tx_in_flight = 0U;
-        tx_len = 0U;
-      }
+      (void)xTaskNotifyWait(0U, 0xFFFFFFFFUL, &ev, pdMS_TO_TICKS(5));
     }
   }
 }
