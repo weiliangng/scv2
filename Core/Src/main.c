@@ -247,11 +247,11 @@ int main(void)
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of usbCDCTxTask */
-  osThreadStaticDef(usbCDCTxTask, StartUsbCDCTxTask, osPriorityIdle, 0, 512, usbCDCTxTaskBuffer, &usbCDCTxTaskControlBlock);
+  osThreadStaticDef(usbCDCTxTask, StartUsbCDCTxTask, osPriorityNormal, 0, 512, usbCDCTxTaskBuffer, &usbCDCTxTaskControlBlock);
   usbCDCTxTaskHandle = osThreadCreate(osThread(usbCDCTxTask), NULL);
 
   /* definition and creation of telemetryTask */
-  osThreadStaticDef(telemetryTask, StartTelemetryTask, osPriorityLow, 0, 512, telemetryTaskBuffer, &telemetryTaskControlBlock);
+  osThreadStaticDef(telemetryTask, StartTelemetryTask, osPriorityNormal, 0, 512, telemetryTaskBuffer, &telemetryTaskControlBlock);
   telemetryTaskHandle = osThreadCreate(osThread(telemetryTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
