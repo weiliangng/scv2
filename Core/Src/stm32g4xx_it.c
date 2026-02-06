@@ -207,6 +207,10 @@ void DMA1_Channel1_IRQHandler(void)
     const float inv_v_bus = A_VBUS_INV / denom;
     const float i_conv = (p_set * inv_v_bus) - i_load;
 
+    // Fast: one write to BSRR (set or reset PB1) based on i_conv sign.
+    // (BS1 sets PB1; BR1 resets PB1).
+    GPIOB->BSRR = (i_conv > 0.0f) ? GPIO_BSRR_BS1 : GPIO_BSRR_BR1;
+
     const uint16_t n_dac_p = clamp_u12((int32_t)(A_INP + (i_conv * B_INP)));
     const uint16_t n_dac_n = clamp_u12((int32_t)(A_INN + (i_conv * B_INN)));
 
