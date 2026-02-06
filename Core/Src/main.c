@@ -27,7 +27,6 @@
 
 #include "task_dbg_over_usb.h"
 #include "shared_state.h"
-#include "inv_adc_lut.h"
 
 /* USER CODE END Includes */
 
@@ -161,7 +160,6 @@ int main(void)
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   CycleCountWatchdog_Init();
-  InvAdc_Init();
   DbgUsb_Init();
   if (HAL_DAC_Start(&hdac1, DAC_CHANNEL_1) != HAL_OK)
   {
@@ -1113,7 +1111,7 @@ void StartTelemetryTask(void const * argument)
                        (unsigned long)dma1_ch1_cycles_last,
                        (unsigned long)dma1_ch1_cycles_max);
     dbg_write((const uint8_t *)msg, (uint16_t)len);
-    osDelay(100);
+    osDelay(10);
   }
   /* USER CODE END StartTelemetryTask */
 }

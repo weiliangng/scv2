@@ -26,7 +26,6 @@
 #include "stm32g4xx_ll_dma.h"
 #include "stm32g4xx_ll_gpio.h"
 #include "app_constants.h"
-#include "inv_adc_lut.h"
 #include "shared_state.h"
 /* USER CODE END Includes */
 
@@ -186,7 +185,7 @@ void DebugMon_Handler(void)
 void DMA1_Channel1_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Channel1_IRQn 0 */
-  //const uint32_t irq_start_cycles = DWT->CYCCNT;
+  const uint32_t irq_start_cycles = DWT->CYCCNT;
   if (LL_DMA_IsActiveFlag_TC1(DMA1) != 0U)
   {
     LL_DMA_ClearFlag_GI1(DMA1);
@@ -205,7 +204,9 @@ void DMA1_Channel1_IRQHandler(void)
     const float i_load = (A_ILOAD * (float)n_adc_iload) + B_ILOAD;
 
     const float p_set = g_can_rx.p_set_cmd;
-    const float inv_v_bus = A_VBUS_INV * InvAdc_LookupClampedI32((int32_t)((float)n_adc_vbus + N_OFFSET));
+    float denom = (float)n_adc_vbus + N_OFFSET;
+    if (denom < 1.0f) { denom = 1.0f; }
+    const float inv_v_bus = A_VBUS_INV / denom;
     const float i_conv = (p_set * inv_v_bus) - i_load;
 
     const uint16_t n_dac_p = clamp_u12((int32_t)(A_INP + (i_conv * B_INP)));
@@ -224,13 +225,13 @@ void DMA1_Channel1_IRQHandler(void)
   {
     LL_DMA_ClearFlag_GI1(DMA1);
   }
-/*
+
   const uint32_t irq_cycles = (uint32_t)(DWT->CYCCNT - irq_start_cycles);
   g_dma1_ch1_irq_cycles_last = irq_cycles;
   if (irq_cycles > g_dma1_ch1_irq_cycles_max)
   {
     g_dma1_ch1_irq_cycles_max = irq_cycles;
-  }*/
+  }
   return;
   /* USER CODE END DMA1_Channel1_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_adc1);
