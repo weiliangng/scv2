@@ -46,6 +46,9 @@ void DbgUsb_Init(void);
 // Debug USB CDC TX task body. Call from a CubeMX-generated task entry function.
 void DbgUsb_TxTask(void const *argument);
 
+// Called from the USB CDC TX-complete callback (ISR context) to wake the TX task.
+void DbgUsb_OnTxCompleteFromISR(void);
+
 // Enqueue raw bytes for USB CDC transmission. ISR-safe, non-blocking.
 void dbg_write(const uint8_t *data, uint16_t len);
 // Enqueue formatted text (max 127 bytes). ISR-safe, non-blocking.

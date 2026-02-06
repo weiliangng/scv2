@@ -26,6 +26,7 @@
 #include <stdio.h>
 
 #include "task_dbg_over_usb.h"
+#include "usb_cli.h"
 #include "app_constants.h"
 #include "shared_state.h"
 
@@ -170,6 +171,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   CycleCountWatchdog_Init();
   DbgUsb_Init();
+  UsbCli_Init();
   if (HAL_DAC_Start(&hdac1, DAC_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
@@ -1115,6 +1117,12 @@ void StartTelemetryTask(void const * argument)
   char msg[256];
   for(;;)
   {
+    if (!g_telemetry_enabled)
+    {
+      osDelay(50);
+      continue;
+    }
+
     const float v_bus = g_latest.v_bus;
     const float v_cap = g_latest.v_cap;
     const float i_load = g_latest.i_load;
@@ -1196,11 +1204,7 @@ void StartSlowAdcTask(void const * argument)
 void StartCliTask(void const * argument)
 {
   /* USER CODE BEGIN StartCliTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+  UsbCli_Task(argument);
   /* USER CODE END StartCliTask */
 }
 

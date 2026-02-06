@@ -87,4 +87,10 @@ extern volatile uart_rx_state_t g_uart_rx;
  */
 extern volatile bool g_control_automatic;
 
+/*
+ * Telemetry stream enable:
+ * - When disabled, the telemetry task stays idle (no USB output spam while using the CLI).
+ */
+extern volatile bool g_telemetry_enabled;
+
 #endif /* SHARED_STATE_H */

@@ -15,3 +15,4 @@ volatile can_rx_state_t g_can_rx = {
 volatile uart_rx_state_t g_uart_rx;
 
 volatile bool g_control_automatic = true;
+volatile bool g_telemetry_enabled = true;

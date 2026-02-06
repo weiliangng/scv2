@@ -35,20 +35,26 @@
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern void Error_Handler(void);
 
-#define DBG_TX_BUF_SIZE 256U
+#define DBG_TX_BUF_SIZE 2048U
 #define DBG_TX_CHUNK_SIZE 64U
+
+#define EV_TX_KICK (1UL << 0)
+#define EV_TX_DONE (1UL << 1)
 
 static StreamBufferHandle_t dbg_stream = NULL;
 static StaticStreamBuffer_t dbg_stream_struct;
 static uint8_t dbg_stream_storage[DBG_TX_BUF_SIZE];
-static uint8_t dbg_tx_chunk[DBG_TX_CHUNK_SIZE];
-static uint16_t dbg_tx_pending_len = 0;
-static uint8_t dbg_tx_in_flight = 0;
+static uint8_t tx_chunk[DBG_TX_CHUNK_SIZE];
+static uint16_t tx_len = 0;
+static uint8_t tx_in_flight = 0;
+static TaskHandle_t dbg_tx_task_handle = NULL;
 static volatile uint32_t dbg_drop_count = 0U;
 
 static uint8_t cdc_tx_ready(void);
 static uint8_t dbg_in_isr(void);
 static void dbg_write_bytes(const uint8_t *data, uint16_t len);
+static void dbg_kick_tx_task_from_isr(BaseType_t *hpw);
+static void dbg_kick_tx_task(void);
 
 void DbgUsb_Init(void)
 {
@@ -76,6 +82,22 @@ static uint8_t dbg_in_isr(void)
   return (__get_IPSR() != 0U) ? 1U : 0U;
 }
 
+static void dbg_kick_tx_task_from_isr(BaseType_t *hpw)
+{
+  if (dbg_tx_task_handle != NULL)
+  {
+    (void)xTaskNotifyFromISR(dbg_tx_task_handle, EV_TX_KICK, eSetBits, hpw);
+  }
+}
+
+static void dbg_kick_tx_task(void)
+{
+  if (dbg_tx_task_handle != NULL)
+  {
+    (void)xTaskNotify(dbg_tx_task_handle, EV_TX_KICK, eSetBits);
+  }
+}
+
 static void dbg_write_bytes(const uint8_t *data, uint16_t len)
 {
   uint8_t in_isr = dbg_in_isr();
@@ -87,9 +109,16 @@ static void dbg_write_bytes(const uint8_t *data, uint16_t len)
     return;
   }
 
+  if (hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED)
+  {
+    dbg_drop_count++;
+    return;
+  }
+
   if (in_isr != 0U)
   {
     sent = xStreamBufferSendFromISR(dbg_stream, data, len, &hpw);
+    dbg_kick_tx_task_from_isr(&hpw);
     if (hpw != pdFALSE)
     {
       portYIELD_FROM_ISR(hpw);
@@ -98,6 +127,7 @@ static void dbg_write_bytes(const uint8_t *data, uint16_t len)
   else
   {
     sent = xStreamBufferSend(dbg_stream, data, len, 0U);
+    dbg_kick_tx_task();
   }
   if (sent < len)
   {
@@ -143,52 +173,85 @@ int dbg_printf(const char *fmt, ...)
   return n;
 }
 
+void DbgUsb_OnTxCompleteFromISR(void)
+{
+  BaseType_t hpw = pdFALSE;
+  if (dbg_tx_task_handle != NULL)
+  {
+    (void)xTaskNotifyFromISR(dbg_tx_task_handle, EV_TX_DONE, eSetBits, &hpw);
+    portYIELD_FROM_ISR(hpw);
+  }
+}
+
 void DbgUsb_TxTask(void const * argument)
 {
   (void)argument;
 
+  dbg_tx_task_handle = xTaskGetCurrentTaskHandle();
+  uint8_t was_configured = 0U;
+
   for(;;)
   {
-    if (hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED)
+    const uint8_t configured = (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED) ? 1U : 0U;
+    if (configured == 0U)
     {
-      dbg_tx_in_flight = 0U;
-      dbg_tx_pending_len = 0U;
-      osDelay(10);
+      if (was_configured != 0U)
+      {
+        uint8_t discard[DBG_TX_CHUNK_SIZE];
+        tx_in_flight = 0U;
+        tx_len = 0U;
+        while (xStreamBufferReceive(dbg_stream, discard, sizeof(discard), 0U) > 0U)
+        {
+          /* Drain stale buffered output. */
+        }
+      }
+      was_configured = 0U;
+      osDelay(20);
       continue;
     }
 
-    if (dbg_tx_in_flight != 0U)
+    was_configured = 1U;
+
+    if ((tx_in_flight == 0U) && (tx_len == 0U))
     {
-      if (cdc_tx_ready())
+      uint32_t ev = 0U;
+      (void)xTaskNotifyWait(0U, 0xFFFFFFFFUL, &ev, pdMS_TO_TICKS(200));
+      tx_len = (uint16_t)xStreamBufferReceive(dbg_stream, tx_chunk, sizeof(tx_chunk), pdMS_TO_TICKS(10));
+      if (tx_len == 0U)
       {
-        dbg_tx_in_flight = 0U;
-        dbg_tx_pending_len = 0U;
+        continue;
+      }
+    }
+
+    if ((tx_in_flight == 0U) && (tx_len > 0U))
+    {
+      const uint8_t r = CDC_Transmit_FS(tx_chunk, tx_len);
+      if (r == USBD_OK)
+      {
+        tx_in_flight = 1U;
       }
       else
       {
-        osDelay(1);
-        continue;
+        uint32_t ev = 0U;
+        (void)xTaskNotifyWait(0U, 0xFFFFFFFFUL, &ev, pdMS_TO_TICKS(5));
       }
     }
 
-    if (dbg_tx_pending_len == 0U)
+    if (tx_in_flight != 0U)
     {
-      dbg_tx_pending_len = (uint16_t)xStreamBufferReceive(dbg_stream, dbg_tx_chunk, DBG_TX_CHUNK_SIZE, 0U);
-      if (dbg_tx_pending_len == 0U)
+      uint32_t ev = 0U;
+      (void)xTaskNotifyWait(0U, 0xFFFFFFFFUL, &ev, pdMS_TO_TICKS(200));
+      if ((ev & EV_TX_DONE) != 0U)
       {
-        osDelay(1);
-        continue;
+        tx_in_flight = 0U;
+        tx_len = 0U;
+      }
+      else if (cdc_tx_ready() != 0U)
+      {
+        /* Fallback: recover if a TX-done notify is missed. */
+        tx_in_flight = 0U;
+        tx_len = 0U;
       }
     }
-
-    if (cdc_tx_ready())
-    {
-      if (CDC_Transmit_FS(dbg_tx_chunk, dbg_tx_pending_len) == USBD_OK)
-      {
-        dbg_tx_in_flight = 1U;
-      }
-    }
-
-    osDelay(1);
   }
 }
