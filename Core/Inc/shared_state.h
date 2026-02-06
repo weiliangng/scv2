@@ -27,6 +27,13 @@ typedef struct
 extern volatile latest_values_t g_latest;
 
 /*
+ * ISR timing metrics (DWT CYCCNT cycles).
+ * Written from ISR context; read from telemetry/task context.
+ */
+extern volatile uint32_t g_dma1_ch1_irq_cycles_last;
+extern volatile uint32_t g_dma1_ch1_irq_cycles_max;
+
+/*
  * ADC DMA buffers updated by hardware/DMA and consumed in ISR/task contexts.
  */
 /*

@@ -186,6 +186,7 @@ void DebugMon_Handler(void)
 void DMA1_Channel1_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Channel1_IRQn 0 */
+  const uint32_t irq_start_cycles = DWT->CYCCNT;
   if (LL_DMA_IsActiveFlag_TC1(DMA1) != 0U)
   {
     LL_DMA_ClearFlag_GI1(DMA1);
@@ -222,6 +223,13 @@ void DMA1_Channel1_IRQHandler(void)
   else
   {
     LL_DMA_ClearFlag_GI1(DMA1);
+  }
+
+  const uint32_t irq_cycles = (uint32_t)(DWT->CYCCNT - irq_start_cycles);
+  g_dma1_ch1_irq_cycles_last = irq_cycles;
+  if (irq_cycles > g_dma1_ch1_irq_cycles_max)
+  {
+    g_dma1_ch1_irq_cycles_max = irq_cycles;
   }
   return;
   /* USER CODE END DMA1_Channel1_IRQn 0 */

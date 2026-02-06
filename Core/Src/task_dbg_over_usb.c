@@ -39,33 +39,29 @@ extern void Error_Handler(void);
 #define DBG_TX_CHUNK_SIZE 64U
 
 static StreamBufferHandle_t dbg_stream = NULL;
+static StaticStreamBuffer_t dbg_stream_struct;
+static uint8_t dbg_stream_storage[DBG_TX_BUF_SIZE];
 static uint8_t dbg_tx_chunk[DBG_TX_CHUNK_SIZE];
 static uint16_t dbg_tx_pending_len = 0;
 static uint8_t dbg_tx_in_flight = 0;
 static volatile uint32_t dbg_drop_count = 0U;
-static osThreadId usbTxTaskHandle;
 
 static uint8_t cdc_tx_ready(void);
 static uint8_t dbg_in_isr(void);
 static void dbg_write_bytes(const uint8_t *data, uint16_t len);
-static void UsbCdcTxTask(void const * argument);
 
 void DbgUsb_Init(void)
 {
-  dbg_stream = xStreamBufferCreate(DBG_TX_BUF_SIZE, 1U);
+  dbg_stream = xStreamBufferCreateStatic(
+      DBG_TX_BUF_SIZE,
+      1U,
+      dbg_stream_storage,
+      &dbg_stream_struct);
   if (dbg_stream == NULL)
   {
     Error_Handler();
   }
 }
-
-void DbgUsb_StartTask(void)
-{
-  osThreadDef(usbTxTask, UsbCdcTxTask, osPriorityLow, 0, 128);
-  usbTxTaskHandle = osThreadCreate(osThread(usbTxTask), NULL);
-  (void)usbTxTaskHandle;
-}
-
 
 static uint8_t cdc_tx_ready(void)
 {
@@ -147,7 +143,7 @@ int dbg_printf(const char *fmt, ...)
   return n;
 }
 
-static void UsbCdcTxTask(void const * argument)
+void DbgUsb_TxTask(void const * argument)
 {
   (void)argument;
 

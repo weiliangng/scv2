@@ -2,6 +2,9 @@
 
 volatile latest_values_t g_latest;
 
+volatile uint32_t g_dma1_ch1_irq_cycles_last;
+volatile uint32_t g_dma1_ch1_irq_cycles_max;
+
 /* See `Core/Inc/shared_state.h` for buffer index meanings. */
 volatile uint16_t g_adc1_dma_buf[2];
 volatile uint16_t g_adc2_dma_buf[3];

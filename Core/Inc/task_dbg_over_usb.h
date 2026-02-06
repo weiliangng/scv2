@@ -28,8 +28,8 @@ extern "C" {
 /*
  * Usage:
  * 1) Call DbgUsb_Init() once after HAL init, before starting the scheduler.
- * 2) Call DbgUsb_StartTask() before osKernelStart() (e.g., inside MX_FREERTOS_Init()).
- * 3) Ensure MX_USB_Device_Init() is called from a task after the scheduler starts.
+ * 2) Ensure MX_USB_Device_Init() is called from a task after the scheduler starts.
+ * 3) Run DbgUsb_TxTask() inside a CubeMX-generated task (e.g., `usbCDCTxTask`).
  * 4) Use dbg_write()/dbg_printf() from tasks or ISRs to enqueue debug output.
  *
  * Notes:
@@ -43,8 +43,8 @@ extern "C" {
 
 // Create the stream buffer used for debug output. Call once at startup.
 void DbgUsb_Init(void);
-// Create the USB CDC TX task. Call once before osKernelStart().
-void DbgUsb_StartTask(void);
+// Debug USB CDC TX task body. Call from a CubeMX-generated task entry function.
+void DbgUsb_TxTask(void const *argument);
 
 // Enqueue raw bytes for USB CDC transmission. ISR-safe, non-blocking.
 void dbg_write(const uint8_t *data, uint16_t len);

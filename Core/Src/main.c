@@ -23,6 +23,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
+
 #include "task_dbg_over_usb.h"
 #include "shared_state.h"
 #include "inv_adc_lut.h"
@@ -106,6 +108,12 @@ void StartTelemetryTask(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static void CycleCountWatchdog_Init(void)
+{
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CYCCNT = 0U;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
 
 /* USER CODE END 0 */
 
@@ -152,6 +160,7 @@ int main(void)
   MX_TIM2_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
+  CycleCountWatchdog_Init();
   InvAdc_Init();
   DbgUsb_Init();
   if (HAL_DAC_Start(&hdac1, DAC_CHANNEL_1) != HAL_OK)
@@ -256,7 +265,6 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  DbgUsb_StartTask();
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
@@ -1043,14 +1051,9 @@ void StartDefaultTask(void const * argument)
   /* 12-bit DAC values for ~1.0V and ~3.0V with Vref = 3.3V */
   const uint32_t dac_val_low = 1241;
   const uint32_t dac_val_high = 3723;
-  static uint32_t hello_seq = 0U;
-  char msg[64];
   /* Infinite loop */
   for(;;)
   {
-    int len = snprintf(msg, sizeof(msg), "id=%lu \r\n",
-                       (unsigned long)hello_seq++);
-    dbg_write((const uint8_t *)msg, (uint16_t)len);
 
     HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_2, DAC_ALIGN_12B_R, dac_val_low);
     osDelay(5);
@@ -1071,11 +1074,7 @@ void StartDefaultTask(void const * argument)
 void StartUsbCDCTxTask(void const * argument)
 {
   /* USER CODE BEGIN StartUsbCDCTxTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+  DbgUsb_TxTask(argument);
   /* USER CODE END StartUsbCDCTxTask */
 }
 
@@ -1090,8 +1089,19 @@ void StartTelemetryTask(void const * argument)
 {
   /* USER CODE BEGIN StartTelemetryTask */
   /* Infinite loop */
+  static uint32_t hello_seq = 0U;
+  char msg[64];
   for(;;)
   {
+    const uint32_t dma1_ch1_cycles_last = g_dma1_ch1_irq_cycles_last;
+    const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
+    int len = snprintf(msg,
+                       sizeof(msg),
+                       "id=%lu last=%lu max=%lu\r\n",
+                       (unsigned long)hello_seq++,
+                       (unsigned long)dma1_ch1_cycles_last,
+                       (unsigned long)dma1_ch1_cycles_max);
+    dbg_write((const uint8_t *)msg, (uint16_t)len);
     osDelay(1);
   }
   /* USER CODE END StartTelemetryTask */
