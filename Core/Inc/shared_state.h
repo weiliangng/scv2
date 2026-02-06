@@ -8,7 +8,7 @@ _Static_assert(sizeof(float) == 4, "Expected 32-bit float");
 
 /*
  * Shared "latest values" block:
- * - Many readers, each field has exactly one writer (owner)
+ * - Many readers, each field has exactly one writer, or multiple writers determined by another state variable (owner)
  * - 32-bit aligned loads/stores are atomic on Cortex-M, so keep these as 32-bit floats
  * - Volatile because some fields are updated in ISRs
  */
