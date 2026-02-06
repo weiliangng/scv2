@@ -68,6 +68,14 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart3;
 
 osThreadId defaultTaskHandle;
+uint32_t defaultTaskBuffer[ 128 ];
+osStaticThreadDef_t defaultTaskControlBlock;
+osThreadId usbCDCTxTaskHandle;
+uint32_t usbCDCTxTaskBuffer[ 512 ];
+osStaticThreadDef_t usbCDCTxTaskControlBlock;
+osThreadId telemetryTaskHandle;
+uint32_t telemetryTaskBuffer[ 512 ];
+osStaticThreadDef_t telemetryTaskControlBlock;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -89,6 +97,8 @@ static void MX_COMP4_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART3_UART_Init(void);
 void StartDefaultTask(void const * argument);
+void StartUsbCDCTxTask(void const * argument);
+void StartTelemetryTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -233,8 +243,16 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+  osThreadStaticDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128, defaultTaskBuffer, &defaultTaskControlBlock);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+
+  /* definition and creation of usbCDCTxTask */
+  osThreadStaticDef(usbCDCTxTask, StartUsbCDCTxTask, osPriorityIdle, 0, 512, usbCDCTxTaskBuffer, &usbCDCTxTaskControlBlock);
+  usbCDCTxTaskHandle = osThreadCreate(osThread(usbCDCTxTask), NULL);
+
+  /* definition and creation of telemetryTask */
+  osThreadStaticDef(telemetryTask, StartTelemetryTask, osPriorityLow, 0, 512, telemetryTaskBuffer, &telemetryTaskControlBlock);
+  telemetryTaskHandle = osThreadCreate(osThread(telemetryTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -1041,6 +1059,42 @@ void StartDefaultTask(void const * argument)
     osDelay(5);
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartUsbCDCTxTask */
+/**
+* @brief Function implementing the usbCDCTxTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartUsbCDCTxTask */
+void StartUsbCDCTxTask(void const * argument)
+{
+  /* USER CODE BEGIN StartUsbCDCTxTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartUsbCDCTxTask */
+}
+
+/* USER CODE BEGIN Header_StartTelemetryTask */
+/**
+* @brief Function implementing the telemetryTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTelemetryTask */
+void StartTelemetryTask(void const * argument)
+{
+  /* USER CODE BEGIN StartTelemetryTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartTelemetryTask */
 }
 
 /**
