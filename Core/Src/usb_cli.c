@@ -34,6 +34,15 @@ static uint8_t usbcli_in_isr(void)
   return (__get_IPSR() != 0U) ? 1U : 0U;
 }
 
+static void usbcli_puts(const char *s)
+{
+  if (s == NULL)
+  {
+    return;
+  }
+  dbg_write((const uint8_t *)s, (uint16_t)strlen(s));
+}
+
 static void usbcli_put_char(void *data, char ch, bool is_last)
 {
   static uint8_t out_buf[64];
@@ -186,7 +195,7 @@ static int usbcli_parse_gpio_pin(const char *s, GPIO_TypeDef **port, uint16_t *p
 
 static void usbcli_cmd_help(void)
 {
-  usbcli_printf(
+  static const char help[] =
       "Commands:\r\n"
       "  help\r\n"
       "  status\r\n"
@@ -194,7 +203,8 @@ static void usbcli_cmd_help(void)
       "  control auto|manual\r\n"
       "  gpio write <PA10|PB1|...> <0|1>\r\n"
       "  gpio toggle <PA10|PB1|...>\r\n"
-      "  dac set <1|3> <1|2> <0..4095>\r\n");
+      "  dac set <1|3> <1|2> <0..4095>\r\n";
+  usbcli_puts(help);
 }
 
 static void usbcli_cmd_status(void)
