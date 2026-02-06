@@ -292,19 +292,11 @@ void HAL_COMP_MspInit(COMP_HandleTypeDef* hcomp)
     __HAL_RCC_GPIOB_CLK_ENABLE();
     /**COMP4 GPIO Configuration
     PB0     ------> COMP4_INP
-    PB1     ------> COMP4_OUT
     */
     GPIO_InitStruct.Pin = GPIO_PIN_0;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = COMP4_DIR_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF8_COMP4;
-    HAL_GPIO_Init(COMP4_DIR_GPIO_Port, &GPIO_InitStruct);
 
     /* USER CODE BEGIN COMP4_MspInit 1 */
 
@@ -330,9 +322,8 @@ void HAL_COMP_MspDeInit(COMP_HandleTypeDef* hcomp)
 
     /**COMP4 GPIO Configuration
     PB0     ------> COMP4_INP
-    PB1     ------> COMP4_OUT
     */
-    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_0|COMP4_DIR_Pin);
+    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_0);
 
     /* USER CODE BEGIN COMP4_MspDeInit 1 */
 
