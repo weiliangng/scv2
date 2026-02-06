@@ -81,6 +81,9 @@ osStaticThreadDef_t telemetryTaskControlBlock;
 osThreadId slowAdcTaskHandle;
 uint32_t myTask04Buffer[ 128 ];
 osStaticThreadDef_t myTask04ControlBlock;
+osThreadId cliTaskHandle;
+uint32_t myTask05Buffer[ 2048 ];
+osStaticThreadDef_t myTask05ControlBlock;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -105,6 +108,7 @@ void StartDefaultTask(void const * argument);
 void StartUsbCDCTxTask(void const * argument);
 void StartTelemetryTask(void const * argument);
 void StartSlowAdcTask(void const * argument);
+void StartCliTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -269,6 +273,10 @@ int main(void)
   /* definition and creation of slowAdcTask */
   osThreadStaticDef(slowAdcTask, StartSlowAdcTask, osPriorityLow, 0, 128, myTask04Buffer, &myTask04ControlBlock);
   slowAdcTaskHandle = osThreadCreate(osThread(slowAdcTask), NULL);
+
+  /* definition and creation of cliTask */
+  osThreadStaticDef(cliTask, StartCliTask, osPriorityLow, 0, 2048, myTask05Buffer, &myTask05ControlBlock);
+  cliTaskHandle = osThreadCreate(osThread(cliTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -1176,6 +1184,24 @@ void StartSlowAdcTask(void const * argument)
     osDelay(1);
   }
   /* USER CODE END StartSlowAdcTask */
+}
+
+/* USER CODE BEGIN Header_StartCliTask */
+/**
+* @brief Function implementing the cliTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCliTask */
+void StartCliTask(void const * argument)
+{
+  /* USER CODE BEGIN StartCliTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartCliTask */
 }
 
 /**
