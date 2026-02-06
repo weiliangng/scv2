@@ -5,8 +5,9 @@ const uint32_t VREF_MV = 3300u; // mV (currently unused)
 const float A_VBUS = 0.009654528478f; // V/count
 const float B_VBUS = 0.0f;            // V
 
-const float A_ILOAD = 0.008058608059f; // A/count
-const float B_ILOAD = -16.5f;          // A
+//for single ended mode * 1, for differential mode * 2
+const float A_ILOAD = 0.008058608059f * 2; // A/count
+const float B_ILOAD = -16.5f * 2;          // A
 const float MIDPOINT = 2047.5f;        // count
 
 const float A_VBUS_INV = 1.0f / 0.009654528478f;

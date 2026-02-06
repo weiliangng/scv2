@@ -186,22 +186,22 @@ void DebugMon_Handler(void)
 void DMA1_Channel1_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Channel1_IRQn 0 */
-  const uint32_t irq_start_cycles = DWT->CYCCNT;
+  //const uint32_t irq_start_cycles = DWT->CYCCNT;
   if (LL_DMA_IsActiveFlag_TC1(DMA1) != 0U)
   {
     LL_DMA_ClearFlag_GI1(DMA1);
 
-    LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_4);
+    //LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_4);
 
     // ADC1 (see `shared_state.h`): [0]=Vcap, [1]=Vbus
-    const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
+    //const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
     const uint16_t n_adc_vbus = g_adc1_dma_buf[1] & 0x0FFFU;
 
     // ADC2 (see `shared_state.h`): [0]=ILOAD differential (offset-binary)
     const uint16_t n_adc_iload = g_adc2_dma_buf[0] & 0x0FFFU;
 
     const float v_bus = (A_VBUS * (float)n_adc_vbus) + B_VBUS;
-    const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
+    //const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
     const float i_load = (A_ILOAD * (float)n_adc_iload) + B_ILOAD;
 
     const float p_set = g_can_rx.p_set_cmd;
@@ -212,9 +212,9 @@ void DMA1_Channel1_IRQHandler(void)
     const uint16_t n_dac_n = clamp_u12((int32_t)(A_INN + (i_conv * B_INN)));
 
     g_latest.v_bus = v_bus;
-    g_latest.v_cap = v_cap;
+    //g_latest.v_cap = v_cap;
     g_latest.i_load = i_load;
-    g_latest.i_out = i_conv;
+    g_latest.i_conv = i_conv;
 
     // Optional: mirror ILOAD ADC counts on DAC3_CH1 for scope/debug.
     LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_1, n_adc_iload);
@@ -224,13 +224,13 @@ void DMA1_Channel1_IRQHandler(void)
   {
     LL_DMA_ClearFlag_GI1(DMA1);
   }
-
+/*
   const uint32_t irq_cycles = (uint32_t)(DWT->CYCCNT - irq_start_cycles);
   g_dma1_ch1_irq_cycles_last = irq_cycles;
   if (irq_cycles > g_dma1_ch1_irq_cycles_max)
   {
     g_dma1_ch1_irq_cycles_max = irq_cycles;
-  }
+  }*/
   return;
   /* USER CODE END DMA1_Channel1_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_adc1);

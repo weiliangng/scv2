@@ -19,7 +19,7 @@ typedef struct
   float i_load;
   float i_out_p;
   float i_out_n;
-  float i_out;
+  float i_conv;
   float p_load;
   float p_cap;
 } latest_values_t;

@@ -1090,19 +1090,30 @@ void StartTelemetryTask(void const * argument)
   /* USER CODE BEGIN StartTelemetryTask */
   /* Infinite loop */
   static uint32_t hello_seq = 0U;
-  char msg[64];
+  char msg[128];
   for(;;)
   {
+    const float v_bus = g_latest.v_bus;
+    const float i_load = g_latest.i_load;
+    const float i_conv = g_latest.i_conv;
+
+    const int32_t v_bus_mV = (int32_t)(v_bus * 1000.0f);
+    const int32_t i_load_mA = (int32_t)(i_load * 1000.0f);
+    const int32_t i_conv_mA = (int32_t)(i_conv * 1000.0f);
+
     const uint32_t dma1_ch1_cycles_last = g_dma1_ch1_irq_cycles_last;
     const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu last=%lu max=%lu\r\n",
+                       "id=%lu v_bus_mV=%ld i_load_mA=%ld i_conv_mA=%ld last=%lu max=%lu\r\n",
                        (unsigned long)hello_seq++,
+                       (long)v_bus_mV,
+                       (long)i_load_mA,
+                       (long)i_conv_mA,
                        (unsigned long)dma1_ch1_cycles_last,
                        (unsigned long)dma1_ch1_cycles_max);
     dbg_write((const uint8_t *)msg, (uint16_t)len);
-    osDelay(1);
+    osDelay(100);
   }
   /* USER CODE END StartTelemetryTask */
 }
