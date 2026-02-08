@@ -55,6 +55,7 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+extern FDCAN_HandleTypeDef hfdcan1;
 
 /* USER CODE END EFP */
 

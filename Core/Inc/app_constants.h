@@ -44,5 +44,8 @@ extern const float B_OP;       // A
 extern const float A_ON;       // A/count
 extern const float B_ON;       // A
 
-#endif /* APP_CONSTANTS_H */
+// Supercap telemetry (Classic CAN)
+extern const uint32_t SCAP_STAT_ID;
+extern const uint32_t SCAP_STAT_RATE_HZ; // 10..1000
 
+#endif /* APP_CONSTANTS_H */

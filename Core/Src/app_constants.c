@@ -3,6 +3,9 @@
 #define A_VBUS_VALUE 0.009654528478f // V/count
 #define B_VBUS_VALUE 0.0f            // V
 
+const uint32_t SCAP_STAT_ID = 0x077u;
+const uint32_t SCAP_STAT_RATE_HZ = 1000u;
+
 const uint32_t VREF_MV = 3300u; // mV (currently unused)
 
 const float A_VBUS = A_VBUS_VALUE; // V/count

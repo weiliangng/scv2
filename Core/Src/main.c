@@ -29,6 +29,7 @@
 #include "usb_cli.h"
 #include "app_constants.h"
 #include "shared_state.h"
+#include "telemetry_slow_adc_task.h"
 
 /* USER CODE END Includes */
 
@@ -172,6 +173,10 @@ int main(void)
   CycleCountWatchdog_Init();
   DbgUsb_Init();
   UsbCli_Init();
+  if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK)
+  {
+    Error_Handler();
+  }
   if (HAL_DAC_Start(&hdac1, DAC_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
@@ -1158,40 +1163,6 @@ void StartTelemetryTask(void const * argument)
     osDelay(10);
   }
   /* USER CODE END StartTelemetryTask */
-}
-
-/* USER CODE BEGIN Header_StartSlowAdcTask */
-/**
-* @brief Function implementing the slowAdcTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartSlowAdcTask */
-void StartSlowAdcTask(void const * argument)
-{
-  /* USER CODE BEGIN StartSlowAdcTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
-    const uint16_t n_adc_imonop = g_adc2_dma_buf[1] & 0x0FFFU;
-    const uint16_t n_adc_imonon = g_adc2_dma_buf[2] & 0x0FFFU;
-
-    const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
-
-    const float i_out_p = (A_OP * (float)n_adc_imonop) + B_OP;
-    const float i_out_n = (A_ON * (float)n_adc_imonon) + B_ON;
-
-    const float i_out = (i_out_p > -i_out_n) ? i_out_p : i_out_n;
-
-    g_latest.v_cap = v_cap;
-    g_latest.i_out_p = i_out_p;
-    g_latest.i_out_n = i_out_n;
-    g_latest.i_out = i_out;
-
-    osDelay(1);
-  }
-  /* USER CODE END StartSlowAdcTask */
 }
 
 /* USER CODE BEGIN Header_StartCliTask */
