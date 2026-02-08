@@ -15,7 +15,10 @@ volatile uint16_t g_adc2_dma_buf[3];
 volatile can_rx_state_t g_can_rx = {
     .p_set_cmd = 50.0f,
 };
-volatile uart_rx_state_t g_uart_rx;
+volatile uart_rx_state_t g_uart_rx = {
+    .chassis_power_limit_w = 50.0f,
+    .buf_e_j = 0.0f,
+};
 
 volatile bool g_control_automatic = true;
 volatile bool g_telemetry_enabled = true;

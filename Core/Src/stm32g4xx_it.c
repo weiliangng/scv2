@@ -27,6 +27,7 @@
 #include "stm32g4xx_ll_gpio.h"
 #include "app_constants.h"
 #include "shared_state.h"
+#include "referee_uart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -311,6 +312,7 @@ void TIM1_UP_TIM16_IRQHandler(void)
 void USART3_IRQHandler(void)
 {
   /* USER CODE BEGIN USART3_IRQn 0 */
+  RefereeUart_UsartIdleIsr(&huart3);
 
   /* USER CODE END USART3_IRQn 0 */
   HAL_UART_IRQHandler(&huart3);

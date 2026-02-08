@@ -30,6 +30,7 @@
 #include "app_constants.h"
 #include "shared_state.h"
 #include "telemetry_slow_adc_task.h"
+#include "referee_uart.h"
 
 /* USER CODE END Includes */
 
@@ -1147,6 +1148,8 @@ void StartTelemetryTask(void const * argument)
     const float i_out_n = g_latest.i_out_n;
     const float i_out = g_latest.i_out;
     const float i_conv = g_latest.i_conv;
+    const float chassis_power_limit_w = g_uart_rx.chassis_power_limit_w;
+    const float buf_e_j = g_uart_rx.buf_e_j;
 
     const int32_t v_bus_mV = (int32_t)(v_bus * 1000.0f);
     const int32_t v_cap_mV = (int32_t)(v_cap * 1000.0f);
@@ -1155,12 +1158,14 @@ void StartTelemetryTask(void const * argument)
     const int32_t i_out_n_mA = (int32_t)(i_out_n * 1000.0f);
     const int32_t i_out_mA = (int32_t)(i_out * 1000.0f);
     const int32_t i_conv_mA = (int32_t)(i_conv * 1000.0f);
+    const int32_t plim_w = (int32_t)(chassis_power_limit_w);
+    const int32_t buf_mj = (int32_t)(buf_e_j * 1000.0f);
 
     const uint32_t dma1_ch1_cycles_last = g_dma1_ch1_irq_cycles_last;
     const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu v_bus_mV=%ld v_cap_mV=%ld i_load_mA=%ld i_out_p_mA=%ld i_out_n_mA=%ld i_out_mA=%ld i_conv_mA=%ld last=%lu max=%lu\r\n",
+                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld dlast=%lu dmax=%lu\r\n",
                        (unsigned long)hello_seq++,
                        (long)v_bus_mV,
                        (long)v_cap_mV,
@@ -1169,6 +1174,8 @@ void StartTelemetryTask(void const * argument)
                        (long)i_out_n_mA,
                        (long)i_out_mA,
                        (long)i_conv_mA,
+                       (long)plim_w,
+                       (long)buf_mj,
                        (unsigned long)dma1_ch1_cycles_last,
                        (unsigned long)dma1_ch1_cycles_max);
     dbg_write((const uint8_t *)msg, (uint16_t)len);
@@ -1220,11 +1227,8 @@ void StartCliTask(void const * argument)
 void StartUartParsingTask(void const * argument)
 {
   /* USER CODE BEGIN StartUartParsingTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+  (void)argument;
+  RefereeUart_Task(&huart3);
   /* USER CODE END StartUartParsingTask */
 }
 

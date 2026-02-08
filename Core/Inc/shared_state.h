@@ -79,6 +79,7 @@ extern volatile can_rx_state_t g_can_rx;
  */
 typedef struct
 {
+  float chassis_power_limit_w;
   float buf_e_j;
   uint32_t last_uart_tick;
   uint32_t uart_rx_count;

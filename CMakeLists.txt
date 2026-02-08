@@ -54,6 +54,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/embedded_cli.c
     Core/Src/usb_cli.c
     Core/Src/telemetry_slow_adc_task.c
+    Core/Src/referee_uart.c
 )
 
 # Add include paths
