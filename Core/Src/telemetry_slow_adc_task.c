@@ -51,7 +51,7 @@ static inline uint8_t clamp_u8(int32_t v)
   return (uint8_t)v;
 }
 
-void StartSlowAdcTask(void const *argument)
+void TelemetrySlowAdcTask_Run(void const *argument)
 {
   (void)argument;
 
@@ -141,4 +141,3 @@ void StartSlowAdcTask(void const *argument)
     osDelay(1);
   }
 }
-

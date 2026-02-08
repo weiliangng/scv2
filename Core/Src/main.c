@@ -70,6 +70,7 @@ OPAMP_HandleTypeDef hopamp3;
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart3;
+DMA_HandleTypeDef hdma_usart3_rx;
 
 osThreadId defaultTaskHandle;
 uint32_t defaultTaskBuffer[ 128 ];
@@ -86,6 +87,9 @@ osStaticThreadDef_t myTask04ControlBlock;
 osThreadId cliTaskHandle;
 uint32_t myTask05Buffer[ 2048 ];
 osStaticThreadDef_t myTask05ControlBlock;
+osThreadId uartParsingTaskHandle;
+uint32_t myTask06Buffer[ 256 ];
+osStaticThreadDef_t myTask06ControlBlock;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -111,6 +115,7 @@ void StartUsbCDCTxTask(void const * argument);
 void StartTelemetryTask(void const * argument);
 void StartSlowAdcTask(void const * argument);
 void StartCliTask(void const * argument);
+void StartUartParsingTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -284,6 +289,10 @@ int main(void)
   /* definition and creation of cliTask */
   osThreadStaticDef(cliTask, StartCliTask, osPriorityLow, 0, 2048, myTask05Buffer, &myTask05ControlBlock);
   cliTaskHandle = osThreadCreate(osThread(cliTask), NULL);
+
+  /* definition and creation of uartParsingTask */
+  osThreadStaticDef(uartParsingTask, StartUartParsingTask, osPriorityNormal, 0, 256, myTask06Buffer, &myTask06ControlBlock);
+  uartParsingTaskHandle = osThreadCreate(osThread(uartParsingTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -675,7 +684,7 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.DataSyncJumpWidth = 1;
   hfdcan1.Init.DataTimeSeg1 = 1;
   hfdcan1.Init.DataTimeSeg2 = 1;
-  hfdcan1.Init.StdFiltersNbr = 0;
+  hfdcan1.Init.StdFiltersNbr = 2;
   hfdcan1.Init.ExtFiltersNbr = 0;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
   if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
@@ -935,7 +944,7 @@ static void MX_USART3_UART_Init(void)
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
-  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.Mode = UART_MODE_RX;
   huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart3.Init.OverSampling = UART_OVERSAMPLING_16;
   huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
@@ -980,6 +989,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Channel2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
+  /* DMA1_Channel3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 7, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
 
 }
 
@@ -1165,6 +1177,25 @@ void StartTelemetryTask(void const * argument)
   /* USER CODE END StartTelemetryTask */
 }
 
+/* USER CODE BEGIN Header_StartSlowAdcTask */
+/**
+* @brief Function implementing the slowAdcTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartSlowAdcTask */
+void StartSlowAdcTask(void const * argument)
+{
+  /* USER CODE BEGIN StartSlowAdcTask */
+  TelemetrySlowAdcTask_Run(argument);
+
+  for (;;)
+  {
+    osDelay(1000);
+  }
+  /* USER CODE END StartSlowAdcTask */
+}
+
 /* USER CODE BEGIN Header_StartCliTask */
 /**
 * @brief Function implementing the cliTask thread.
@@ -1177,6 +1208,24 @@ void StartCliTask(void const * argument)
   /* USER CODE BEGIN StartCliTask */
   UsbCli_Task(argument);
   /* USER CODE END StartCliTask */
+}
+
+/* USER CODE BEGIN Header_StartUartParsingTask */
+/**
+* @brief Function implementing the uartParsingTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartUartParsingTask */
+void StartUartParsingTask(void const * argument)
+{
+  /* USER CODE BEGIN StartUartParsingTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartUartParsingTask */
 }
 
 /**
