@@ -131,6 +131,12 @@ static void CycleCountWatchdog_Init(void)
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
 
+static void AppDac3_InitDefaults(void)
+{
+  (void)HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_1, DAC_ALIGN_12B_R, DAC3_CH1_BOOT_U12);
+  (void)HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_2, DAC_ALIGN_12B_R, DAC3_CH2_BOOT_U12);
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -207,6 +213,7 @@ int main(void)
   {
     Error_Handler();
   }
+  AppDac3_InitDefaults();
   if (HAL_OPAMP_Start(&hopamp1) != HAL_OK)
   {
     Error_Handler();
@@ -1138,18 +1145,10 @@ void StartDefaultTask(void const * argument)
   /* init code for USB_Device */
   MX_USB_Device_Init();
   /* USER CODE BEGIN 5 */
-  /* 12-bit DAC values for ~1.0V and ~3.0V with Vref = 3.3V */
-  const uint32_t dac_val_low = 1241;
-  const uint32_t dac_val_high = 3723;
   /* Infinite loop */
   for(;;)
   {
-
-    HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_2, DAC_ALIGN_12B_R, dac_val_low);
-    osDelay(5);
-
-    HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_2, DAC_ALIGN_12B_R, dac_val_high);
-    osDelay(5);
+    osDelay(1000);
   }
   /* USER CODE END 5 */
 }

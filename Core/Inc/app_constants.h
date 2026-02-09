@@ -44,6 +44,12 @@ extern const float B_OP;       // A
 extern const float A_ON;       // A/count
 extern const float B_ON;       // A
 
+// DAC3 default startup values (12-bit, right-aligned).
+// These are written once during init and then remain unchanged unless the CLI
+// overrides them via `dac set 3 <1|2> <0..4095>`.
+extern const uint32_t DAC3_CH1_BOOT_U12;
+extern const uint32_t DAC3_CH2_BOOT_U12;
+
 // Classic CAN (standard 11-bit IDs)
 extern const uint32_t SCAP_STAT_ID; // status/telemetry packets sent out from supercap
 extern const uint32_t METER_ID;     // wattmeter -> (V/I scaled x100)

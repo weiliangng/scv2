@@ -35,3 +35,6 @@ const float B_OP = -10.0f;          // A
 
 const float A_ON = -0.00829074903f; // A/count
 const float B_ON = 10.0f;           // A
+
+const uint32_t DAC3_CH1_BOOT_U12 = 2048u;
+const uint32_t DAC3_CH2_BOOT_U12 = 3723u;

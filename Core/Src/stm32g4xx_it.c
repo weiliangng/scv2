@@ -224,8 +224,6 @@ void DMA1_Channel1_IRQHandler(void)
     const ctrl_src_t ctrl_src = g_ctrl_src;
     if ((ctrl_src == SRC_ALGO) || (ctrl_src == SRC_CAN))
     {
-      // Optional: mirror ILOAD ADC counts on DAC3_CH1 for scope/debug.
-      LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_1, n_adc_iload);
       LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_p, n_dac_n);
     }
 
