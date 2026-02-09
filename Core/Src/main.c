@@ -179,6 +179,14 @@ int main(void)
   CycleCountWatchdog_Init();
   DbgUsb_Init();
   UsbCli_Init();
+  if (HAL_FDCAN_ConfigInterruptLines(&hfdcan1, FDCAN_IT_GROUP_RX_FIFO0, FDCAN_INTERRUPT_LINE0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0u) != HAL_OK)
+  {
+    Error_Handler();
+  }
   if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK)
   {
     Error_Handler();
@@ -1188,6 +1196,9 @@ void StartTelemetryTask(void const * argument)
     const float i_conv = g_latest.i_conv;
     const float chassis_power_limit_w = g_uart_rx.chassis_power_limit_w;
     const float buf_e_j = g_uart_rx.buf_e_j;
+    const uint32_t can_rx_count = g_can_rx.can_rx_count;
+    const float wm_v = meter_v;
+    const float wm_i = meter_i;
 
     const int32_t v_bus_mV = (int32_t)(v_bus * 1000.0f);
     const int32_t v_cap_mV = (int32_t)(v_cap * 1000.0f);
@@ -1196,6 +1207,8 @@ void StartTelemetryTask(void const * argument)
     const int32_t i_out_n_mA = (int32_t)(i_out_n * 1000.0f);
     const int32_t i_out_mA = (int32_t)(i_out * 1000.0f);
     const int32_t i_conv_mA = (int32_t)(i_conv * 1000.0f);
+    const int32_t wm_v_mV = (int32_t)(wm_v * 1000.0f);
+    const int32_t wm_i_mA = (int32_t)(wm_i * 1000.0f);
     const int32_t plim_w = (int32_t)(chassis_power_limit_w);
     const int32_t buf_mj = (int32_t)(buf_e_j * 1000.0f);
 
@@ -1203,7 +1216,7 @@ void StartTelemetryTask(void const * argument)
     const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld dlast=%lu dmax=%lu\r\n",
+                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld can_rx=%lu wm_v_mV=%ld wm_i_mA=%ld dlast=%lu dmax=%lu\r\n",
                        (unsigned long)hello_seq++,
                        (long)v_bus_mV,
                        (long)v_cap_mV,
@@ -1214,6 +1227,9 @@ void StartTelemetryTask(void const * argument)
                        (long)i_conv_mA,
                        (long)plim_w,
                        (long)buf_mj,
+                       (unsigned long)can_rx_count,
+                       (long)wm_v_mV,
+                       (long)wm_i_mA,
                        (unsigned long)dma1_ch1_cycles_last,
                        (unsigned long)dma1_ch1_cycles_max);
     dbg_write((const uint8_t *)msg, (uint16_t)len);

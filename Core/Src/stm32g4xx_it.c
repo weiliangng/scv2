@@ -344,4 +344,64 @@ void USART3_IRQHandler(void)
 
 /* USER CODE BEGIN 1 */
 
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+{
+  if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == 0U)
+  {
+    return;
+  }
+
+  FDCAN_RxHeaderTypeDef rxh;
+  uint8_t d[8];
+
+  while (HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0) > 0U)
+  {
+    if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &rxh, d) != HAL_OK)
+    {
+      break;
+    }
+
+    if (rxh.IdType != FDCAN_STANDARD_ID)
+    {
+      continue;
+    }
+
+    if (rxh.DataLength < FDCAN_DLC_BYTES_4)
+    {
+      continue;
+    }
+
+    g_can_rx.last_can_tick = HAL_GetTick();
+    g_can_rx.can_rx_count++;
+
+    if (rxh.Identifier == METER_ID)
+    {
+      const uint16_t raw_v = (uint16_t)d[0] | ((uint16_t)d[1] << 8);
+      const int16_t raw_i = (int16_t)((uint16_t)d[2] | ((uint16_t)d[3] << 8));
+
+      meter_v = (float)raw_v / 100.0f;
+      meter_i = (float)raw_i / 100.0f;
+      continue;
+    }
+
+    if (rxh.Identifier == SCAP_CMD_ID)
+    {
+      const uint8_t settings = d[0];
+
+      g_can_rx.settings_raw = settings;
+      g_can_rx.en = (settings & (1u << 0)) != 0u;
+      g_can_rx.mode = (settings & (1u << 1)) != 0u;
+      g_can_rx.dir = (settings & (1u << 2)) != 0u;
+      g_can_rx.override_power = (settings & (1u << 3)) != 0u;
+      g_can_rx.siphon_buffer = (settings & (1u << 4)) != 0u;
+
+      g_can_rx.can_power = (uint16_t)d[1] | ((uint16_t)d[2] << 8);
+      g_can_rx.can_buf = d[3];
+
+      g_can_rx.p_set_cmd = (float)g_can_rx.can_power;
+      continue;
+    }
+  }
+}
+
 /* USER CODE END 1 */
