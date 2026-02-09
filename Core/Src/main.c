@@ -693,6 +693,39 @@ static void MX_FDCAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
+  /*
+   * Accept only METER_ID and SCAP_CMD_ID; reject everything else.
+   * Must be called before HAL_FDCAN_Start().
+   */
+  if (HAL_FDCAN_ConfigGlobalFilter(&hfdcan1,
+                                  FDCAN_REJECT,         /* NonMatchingStd */
+                                  FDCAN_REJECT,         /* NonMatchingExt */
+                                  FDCAN_REJECT_REMOTE,  /* RejectRemoteStd */
+                                  FDCAN_REJECT_REMOTE   /* RejectRemoteExt */
+                                  ) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  FDCAN_FilterTypeDef filter = {0};
+  filter.IdType = FDCAN_STANDARD_ID;
+  filter.FilterType = FDCAN_FILTER_MASK;
+  filter.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+  filter.FilterID2 = 0x7FF; /* exact match mask for 11-bit IDs */
+
+  filter.FilterIndex = 0;
+  filter.FilterID1 = METER_ID;
+  if (HAL_FDCAN_ConfigFilter(&hfdcan1, &filter) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  filter.FilterIndex = 1;
+  filter.FilterID1 = SCAP_CMD_ID;
+  if (HAL_FDCAN_ConfigFilter(&hfdcan1, &filter) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
   /* USER CODE END FDCAN1_Init 2 */
 
