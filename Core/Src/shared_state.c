@@ -20,6 +20,5 @@ volatile uint16_t g_adc2_dma_buf[3];
 volatile can_rx_state_t g_can_rx;
 volatile uart_rx_state_t g_uart_rx;
 
-volatile bool g_control_automatic = true;
-volatile dir_src_t g_dir_src = DIR_SRC_ALGO;
+volatile ctrl_src_t g_ctrl_src = SRC_ALGO;
 volatile bool g_telemetry_enabled = true;

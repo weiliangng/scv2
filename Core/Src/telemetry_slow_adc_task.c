@@ -11,6 +11,7 @@
 
 #include "app_constants.h"
 #include "shared_state.h"
+#include "scap_io_owner.h"
 
 static inline uint16_t clamp_u16(int32_t v)
 {
@@ -55,6 +56,8 @@ void TelemetrySlowAdcTask_Run(void const *argument)
 {
   (void)argument;
 
+  ScapIo_Init();
+
   static const uint8_t status_code = 0u;
   FDCAN_TxHeaderTypeDef tx_header = {
       .Identifier = SCAP_STAT_ID,
@@ -87,6 +90,8 @@ void TelemetrySlowAdcTask_Run(void const *argument)
 
   for (;;)
   {
+    ScapIo_Tick1kHz();
+
     const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
     const uint16_t n_adc_imonop = g_adc2_dma_buf[1] & 0x0FFFU;
     const uint16_t n_adc_imonon = g_adc2_dma_buf[2] & 0x0FFFU;

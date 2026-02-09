@@ -9,6 +9,7 @@
 #include "task_dbg_over_usb.h"
 
 #include "main.h"
+#include "scap_io_owner.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -200,7 +201,10 @@ static void usbcli_cmd_help(void)
       "  help\r\n"
       "  status\r\n"
       "  telemetry on|off|toggle\r\n"
-      "  control auto|manual\r\n"
+      "  ctrl <algo|can|manual>\r\n"
+      "  swen <0|1>\r\n"
+      "  mode <ccm|hcm|dcm|burst>\r\n"
+      "  dir <0|1>\r\n"
       "  gpio write <PA10|PB1|...> <0|1>\r\n"
       "  gpio toggle <PA10|PB1|...>\r\n"
       "  dac set <1|3> <1|2> <0..4095>\r\n";
@@ -209,9 +213,28 @@ static void usbcli_cmd_help(void)
 
 static void usbcli_cmd_status(void)
 {
-  usbcli_printf("telemetry=%s control=%s\r\n",
+  const char *src = "unknown";
+  switch (g_ctrl_src)
+  {
+  case SRC_MANUAL:
+    src = "manual";
+    break;
+  case SRC_CAN:
+    src = "can";
+    break;
+  case SRC_ALGO:
+  default:
+    src = "algo";
+    break;
+  }
+
+  usbcli_printf("telemetry=%s ctrl=%s swen=%u mode=%u%u dir=%u\r\n",
                 g_telemetry_enabled ? "on" : "off",
-                g_control_automatic ? "auto" : "manual");
+                src,
+                (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_SWEN_Pin) != GPIO_PIN_RESET) ? 1u : 0u),
+                (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_MODEMSB_Pin) != GPIO_PIN_RESET) ? 1u : 0u),
+                (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_MODELSB_Pin) != GPIO_PIN_RESET) ? 1u : 0u),
+                (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_DIR_Pin) != GPIO_PIN_RESET) ? 1u : 0u));
 
   const int32_t v_bus_mV = (int32_t)(g_latest.v_bus * 1000.0f);
   const int32_t v_cap_mV = (int32_t)(g_latest.v_cap * 1000.0f);
@@ -256,30 +279,120 @@ static void usbcli_cmd_telemetry(int argc, char **argv)
   usbcli_printf("telemetry=%s\r\n", g_telemetry_enabled ? "on" : "off");
 }
 
-static void usbcli_cmd_control(int argc, char **argv)
+static int usbcli_parse_mode(const char *s, scap_mode_t *out)
+{
+  if ((s == NULL) || (out == NULL))
+  {
+    return 0;
+  }
+
+  if (usbcli_streq(s, "ccm"))
+  {
+    *out = SCAP_MODE_CCM;
+    return 1;
+  }
+  if (usbcli_streq(s, "hcm"))
+  {
+    *out = SCAP_MODE_HCM;
+    return 1;
+  }
+  if (usbcli_streq(s, "dcm"))
+  {
+    *out = SCAP_MODE_DCM;
+    return 1;
+  }
+  if (usbcli_streq(s, "burst"))
+  {
+    *out = SCAP_MODE_BURST;
+    return 1;
+  }
+
+  return 0;
+}
+
+static void usbcli_cmd_ctrl(int argc, char **argv)
 {
   if (argc < 2)
   {
-    usbcli_printf("usage: control auto|manual\r\n");
+    usbcli_printf("usage: ctrl <algo|can|manual>\r\n");
     return;
   }
 
-  if (usbcli_streq(argv[1], "auto"))
+  if (usbcli_streq(argv[1], "algo"))
   {
-    g_control_automatic = true;
+    g_ctrl_src = SRC_ALGO;
+  }
+  else if (usbcli_streq(argv[1], "can"))
+  {
+    g_ctrl_src = SRC_CAN;
   }
   else if (usbcli_streq(argv[1], "manual"))
   {
-    g_control_automatic = false;
+    g_ctrl_src = SRC_MANUAL;
   }
   else
   {
-    usbcli_printf("usage: control auto|manual\r\n");
+    usbcli_printf("usage: ctrl <algo|can|manual>\r\n");
     return;
   }
 
-  usbcli_printf("control=%s\r\n", g_control_automatic ? "auto" : "manual");
+  usbcli_printf("ok\r\n");
 }
+
+static void usbcli_cmd_swen(int argc, char **argv)
+{
+  if (argc < 2)
+  {
+    usbcli_printf("usage: swen <0|1>\r\n");
+    return;
+  }
+
+  uint32_t v = 0u;
+  if ((!usbcli_parse_u32(argv[1], &v)) || (v > 1u))
+  {
+    usbcli_printf("usage: swen <0|1>\r\n");
+    return;
+  }
+  ScapIo_ManualSetSwen(v != 0u);
+  usbcli_printf("ok\r\n");
+}
+
+static void usbcli_cmd_dir(int argc, char **argv)
+{
+  if (argc < 2)
+  {
+    usbcli_printf("usage: dir <0|1>\r\n");
+    return;
+  }
+
+  uint32_t v = 0u;
+  if ((!usbcli_parse_u32(argv[1], &v)) || (v > 1u))
+  {
+    usbcli_printf("usage: dir <0|1>\r\n");
+    return;
+  }
+  ScapIo_ManualSetDir(v != 0u);
+  usbcli_printf("ok\r\n");
+}
+
+static void usbcli_cmd_mode(int argc, char **argv)
+{
+  if (argc < 2)
+  {
+    usbcli_printf("usage: mode <ccm|hcm|dcm|burst>\r\n");
+    return;
+  }
+
+  scap_mode_t m;
+  if (!usbcli_parse_mode(argv[1], &m))
+  {
+    usbcli_printf("usage: mode <ccm|hcm|dcm|burst>\r\n");
+    return;
+  }
+  ScapIo_ManualSetMode(m);
+  usbcli_printf("ok\r\n");
+}
+
 
 static void usbcli_cmd_gpio(int argc, char **argv)
 {
@@ -301,9 +414,9 @@ static void usbcli_cmd_gpio(int argc, char **argv)
       return;
     }
 
-    if (g_control_automatic)
+    if ((port == GPIOB) && ((pin & (GPIO_DIR_Pin | GPIO_SWEN_Pin | GPIO_MODEMSB_Pin | GPIO_MODELSB_Pin)) != 0u))
     {
-      usbcli_printf("note: control=auto may override some outputs\r\n");
+      usbcli_printf("note: IO owner may override PB1/PB4/PB5/PB6; use 'ctrl/swen/mode/dir'\r\n");
     }
 
     HAL_GPIO_WritePin(port, pin, (v != 0U) ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -318,9 +431,9 @@ static void usbcli_cmd_gpio(int argc, char **argv)
       usbcli_printf("usage: gpio toggle <PA10|...>\r\n");
       return;
     }
-    if (g_control_automatic)
+    if ((port == GPIOB) && ((pin & (GPIO_DIR_Pin | GPIO_SWEN_Pin | GPIO_MODEMSB_Pin | GPIO_MODELSB_Pin)) != 0u))
     {
-      usbcli_printf("note: control=auto may override some outputs\r\n");
+      usbcli_printf("note: IO owner may override PB1/PB4/PB5/PB6; use 'ctrl/swen/mode/dir'\r\n");
     }
     HAL_GPIO_TogglePin(port, pin);
     usbcli_printf("ok\r\n");
@@ -378,9 +491,9 @@ static void usbcli_cmd_dac(int argc, char **argv)
     return;
   }
 
-  if ((dac_n == 1U) && g_control_automatic)
+  if ((dac_n == 1U) && (g_ctrl_src != SRC_MANUAL))
   {
-    usbcli_printf("err: control=auto updates DAC1 in ISR; run 'control manual' first\r\n");
+    usbcli_printf("err: DAC1 updated in ISR (src=algo/can); run 'ctrl manual' first\r\n");
     return;
   }
 
@@ -409,9 +522,21 @@ static void usbcli_handle_line(struct embedded_cli *cli)
   {
     usbcli_cmd_telemetry(argc, argv);
   }
-  else if (usbcli_streq(argv[0], "control"))
+  else if (usbcli_streq(argv[0], "ctrl"))
   {
-    usbcli_cmd_control(argc, argv);
+    usbcli_cmd_ctrl(argc, argv);
+  }
+  else if (usbcli_streq(argv[0], "swen"))
+  {
+    usbcli_cmd_swen(argc, argv);
+  }
+  else if (usbcli_streq(argv[0], "mode"))
+  {
+    usbcli_cmd_mode(argc, argv);
+  }
+  else if (usbcli_streq(argv[0], "dir"))
+  {
+    usbcli_cmd_dir(argc, argv);
   }
   else if (usbcli_streq(argv[0], "gpio"))
   {

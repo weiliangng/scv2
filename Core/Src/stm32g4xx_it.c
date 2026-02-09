@@ -27,6 +27,7 @@
 #include "stm32g4xx_ll_gpio.h"
 #include "app_constants.h"
 #include "shared_state.h"
+#include "scap_io_owner.h"
 #include "referee_uart.h"
 /* USER CODE END Includes */
 
@@ -220,21 +221,20 @@ void DMA1_Channel1_IRQHandler(void)
     g_latest.i_load = i_load;
     g_latest.i_conv = i_conv;
 
-    if (g_control_automatic)
+    const ctrl_src_t ctrl_src = g_ctrl_src;
+    if ((ctrl_src == SRC_ALGO) || (ctrl_src == SRC_CAN))
     {
-      const dir_src_t dir_src = g_dir_src;
-
       // Optional: mirror ILOAD ADC counts on DAC3_CH1 for scope/debug.
       LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_1, n_adc_iload);
       LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_p, n_dac_n);
+    }
 
-      // Only let ISR drive DIR when in ALGO ownership.
-      if (dir_src == DIR_SRC_ALGO)
-      {
-        // Fast: one write to BSRR (set or reset PB1) based on i_conv sign.
-        // (BS1 sets PB1; BR1 resets PB1).
-        GPIOB->BSRR = (i_conv > 0.0f) ? GPIO_BSRR_BS1 : GPIO_BSRR_BR1;
-      }
+    // Only let ISR drive DIR when in ALGO ownership.
+    if (ctrl_src == SRC_ALGO)
+    {
+      // Fast: one write to BSRR (set or reset PB1) based on i_conv sign.
+      // (BS1 sets PB1; BR1 resets PB1).
+      GPIOB->BSRR = (i_conv > 0.0f) ? GPIO_BSRR_BS1 : GPIO_BSRR_BR1;
     }
   }
   else
@@ -395,10 +395,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
       g_can_rx.override_power = (settings & (1u << 3)) != 0u;
       g_can_rx.siphon_buffer = (settings & (1u << 4)) != 0u;
 
+      g_can_rx.last_cmd_tick = g_can_rx.last_can_tick;
       g_can_rx.can_power = (uint16_t)d[1] | ((uint16_t)d[2] << 8);//can target power
       g_can_rx.can_buf = d[3];//target buffer
 
       g_latest.p_set = (float)g_can_rx.can_power;//to be changed later
+      ScapIo_CanRxUpdateIsr(g_can_rx.en, g_can_rx.dir, g_can_rx.mode);
       continue;
     }
   }

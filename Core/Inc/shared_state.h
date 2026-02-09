@@ -66,6 +66,7 @@ extern volatile float meter_i; // Amps  from wattmeter (ID=METER_ID, decoded fro
 typedef struct
 {
   uint32_t last_can_tick;
+  uint32_t last_cmd_tick;
   uint32_t can_rx_count;
   uint8_t settings_raw;
   uint16_t can_power;//
@@ -78,6 +79,15 @@ typedef struct
 } can_rx_state_t;
 
 extern volatile can_rx_state_t g_can_rx;
+
+typedef enum
+{
+  SRC_MANUAL = 0, // cli request
+  SRC_CAN = 1,    // can request
+  SRC_ALGO = 2,   // default on startup
+} ctrl_src_t;
+
+extern volatile ctrl_src_t g_ctrl_src;
 
 /*
  * UART receive ISR state.
@@ -93,26 +103,9 @@ typedef struct
 extern volatile uart_rx_state_t g_uart_rx;
 
 /*
- * Control mode:
- * - Automatic: fast DMA ISR drives DAC + control GPIOs
- * - Manual: DMA ISR computes/updates telemetry only; hardware writes are gated off
+ * Control source for power-stage IO (SWEN/MODE/DIR).
+ * When SRC_ALGO is selected, the fast DMA ISR controls DIR.
  */
-extern volatile bool g_control_automatic;
-
-/*
- * DIR (direction GPIO) ownership:
- * - Manual: DIR driven by local/manual control
- * - CAN:    DIR driven by CAN control
- * - ALGO:   DIR driven by the fast DMA ISR (algorithm)
- */
-typedef enum
-{
-  DIR_SRC_MANUAL = 0,
-  DIR_SRC_CAN = 1,
-  DIR_SRC_ALGO = 2,
-} dir_src_t;
-
-extern volatile dir_src_t g_dir_src;
 
 /*
  * Telemetry stream enable:
