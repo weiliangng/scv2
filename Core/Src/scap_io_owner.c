@@ -60,9 +60,9 @@ static uint16_t g_last_ext_md_dir;
 
 void ScapIo_Init(void)
 {
-  g_pb_manual = pb_pack(SCAP_MODE_CCM, false, false);
-  g_pb_can = pb_pack(SCAP_MODE_CCM, false, false);
-  g_pb_algo = pb_pack(SCAP_MODE_CCM, false, true);
+  g_pb_manual = pb_pack(BIDIRECTIONAL, false, false);
+  g_pb_can = pb_pack(BIDIRECTIONAL, false, false);
+  g_pb_algo = pb_pack(BIDIRECTIONAL, false, true);
 
   g_fault_latched = 0u;
   g_swen_pulse_req_ms = 0u;
@@ -139,12 +139,12 @@ void ScapIo_ManualSetSwen(bool swen_high)
 
 void ScapIo_CanRxUpdateIsr(bool swen_high, bool dir_high, bool mode_bit)
 {
-  const scap_mode_t mode = (mode_bit == false) ? SCAP_MODE_CCM : SCAP_MODE_HCM;
+  const scap_mode_t mode = (mode_bit == false) ? BIDIRECTIONAL : UNIDIRECTIONAL;
   g_pb_can = pb_pack(mode, dir_high, swen_high);
 
   /*
    * CAN mode bit serves two purposes:
-   * - Select external MODE pins: 0=CCM, 1=HCM
+   * - Select external MODE pins: 0=BIDIRECTIONAL, 1=UNIDIRECTIONAL
    * - Select controller:         0=ALGO, 1=CAN
    *
    * Manual always has priority and cannot be preempted by CAN.
