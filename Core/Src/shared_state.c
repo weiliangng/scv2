@@ -1,6 +1,8 @@
 #include "shared_state.h"
 
-volatile latest_values_t g_latest;
+volatile latest_values_t g_latest = {
+    .p_set = 50.0f,
+};
 
 volatile float meter_v = 0.0f;
 volatile float meter_i = 0.0f;
@@ -15,13 +17,8 @@ volatile uint32_t g_dma1_ch1_irq_cycles_max;
 volatile uint16_t g_adc1_dma_buf[2];
 volatile uint16_t g_adc2_dma_buf[3];
 
-volatile can_rx_state_t g_can_rx = {
-    .p_set_cmd = 50.0f,
-};
-volatile uart_rx_state_t g_uart_rx = {
-    .chassis_power_limit_w = 50.0f,
-    .buf_e_j = 0.0f,
-};
+volatile can_rx_state_t g_can_rx;
+volatile uart_rx_state_t g_uart_rx;
 
 volatile bool g_control_automatic = true;
 volatile dir_src_t g_dir_src = DIR_SRC_ALGO;

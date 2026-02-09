@@ -22,7 +22,7 @@ typedef struct
   float i_out_n;
   float i_conv;
   float p_load;
-  float p_cap;
+  float p_set;//multiple writers detected
 } latest_values_t;
 
 extern volatile latest_values_t g_latest;
@@ -65,17 +65,16 @@ extern volatile float meter_i; // Amps  from wattmeter (ID=METER_ID, decoded fro
 
 typedef struct
 {
-  float p_set_cmd;
   uint32_t last_can_tick;
   uint32_t can_rx_count;
   uint8_t settings_raw;
-  uint16_t can_power;
-  uint8_t can_buf;
-  bool siphon_buffer;
-  bool override_power;
-  bool mode;
-  bool dir;
-  bool en;
+  uint16_t can_power;//
+  uint8_t can_buf;//
+  bool siphon_buffer;//yes(activate PID control) or no (Pset = chassis_power_limit_w)
+  bool override_power;//yes (Pset = Pset
+  bool mode;//
+  bool dir;//
+  bool en;//enable switching
 } can_rx_state_t;
 
 extern volatile can_rx_state_t g_can_rx;

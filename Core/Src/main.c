@@ -1057,11 +1057,14 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_DIR_Pin|GPIO_RVSOFF_Pin|GPIO_SWEN_Pin|GPIO_MODEMSB_Pin
-                          |GPIO_MODELSB_Pin|GPIO_NSIL_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_DIR_Pin|GPIO_SWEN_Pin|GPIO_MODEMSB_Pin|GPIO_MODELSB_Pin
+                          |GPIO_NSIL_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIO_LED_GPIO_Port, GPIO_LED_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIO_RVSOFF_GPIO_Port, GPIO_RVSOFF_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -1196,6 +1199,7 @@ void StartTelemetryTask(void const * argument)
     const float i_conv = g_latest.i_conv;
     const float chassis_power_limit_w = g_uart_rx.chassis_power_limit_w;
     const float buf_e_j = g_uart_rx.buf_e_j;
+    const uint32_t uart_rx_count = g_uart_rx.uart_rx_count;
     const uint32_t can_rx_count = g_can_rx.can_rx_count;
     const float wm_v = meter_v;
     const float wm_i = meter_i;
@@ -1216,7 +1220,7 @@ void StartTelemetryTask(void const * argument)
     const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld can_rx=%lu wm_v_mV=%ld wm_i_mA=%ld dlast=%lu dmax=%lu\r\n",
+                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld uart_rx=%lu can_rx=%lu wm_v_mV=%ld wm_i_mA=%ld dlast=%lu dmax=%lu\r\n",
                        (unsigned long)hello_seq++,
                        (long)v_bus_mV,
                        (long)v_cap_mV,
@@ -1227,6 +1231,7 @@ void StartTelemetryTask(void const * argument)
                        (long)i_conv_mA,
                        (long)plim_w,
                        (long)buf_mj,
+                       (unsigned long)uart_rx_count,
                        (unsigned long)can_rx_count,
                        (long)wm_v_mV,
                        (long)wm_i_mA,

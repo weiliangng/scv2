@@ -205,7 +205,7 @@ void DMA1_Channel1_IRQHandler(void)
     const float v_bus = (A_VBUS * (float)n_adc_vbus) + B_VBUS;
     const float i_load = (A_ILOAD * (float)n_adc_iload) + B_ILOAD;
 
-    const float p_set = g_can_rx.p_set_cmd;
+    const float p_set = g_latest.p_set;
     float denom = (float)n_adc_vbus + N_OFFSET;
     if (denom < 1.0f) { denom = 1.0f; }
     const float inv_v_bus = A_VBUS_INV / denom;
@@ -398,7 +398,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
       g_can_rx.can_power = (uint16_t)d[1] | ((uint16_t)d[2] << 8);
       g_can_rx.can_buf = d[3];
 
-      g_can_rx.p_set_cmd = (float)g_can_rx.can_power;
+      g_latest.p_set = (float)g_can_rx.can_power;//to be changed later
       continue;
     }
   }
