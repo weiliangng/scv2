@@ -21,4 +21,5 @@ volatile uart_rx_state_t g_uart_rx = {
 };
 
 volatile bool g_control_automatic = true;
+volatile dir_src_t g_dir_src = DIR_SRC_ALGO;
 volatile bool g_telemetry_enabled = true;

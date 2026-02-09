@@ -95,6 +95,21 @@ extern volatile uart_rx_state_t g_uart_rx;
 extern volatile bool g_control_automatic;
 
 /*
+ * DIR (direction GPIO) ownership:
+ * - Manual: DIR driven by local/manual control
+ * - CAN:    DIR driven by CAN control
+ * - ALGO:   DIR driven by the fast DMA ISR (algorithm)
+ */
+typedef enum
+{
+  DIR_SRC_MANUAL = 0,
+  DIR_SRC_CAN = 1,
+  DIR_SRC_ALGO = 2,
+} dir_src_t;
+
+extern volatile dir_src_t g_dir_src;
+
+/*
  * Telemetry stream enable:
  * - When disabled, the telemetry task stays idle (no USB output spam while using the CLI).
  */

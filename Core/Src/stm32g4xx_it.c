@@ -221,13 +221,19 @@ void DMA1_Channel1_IRQHandler(void)
 
     if (g_control_automatic)
     {
+      const dir_src_t dir_src = g_dir_src;
+
       // Optional: mirror ILOAD ADC counts on DAC3_CH1 for scope/debug.
       LL_DAC_ConvertData12RightAligned(DAC3, LL_DAC_CHANNEL_1, n_adc_iload);
       LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_p, n_dac_n);
 
-      // Fast: one write to BSRR (set or reset PB1) based on i_conv sign.
-      // (BS1 sets PB1; BR1 resets PB1).
-      GPIOB->BSRR = (i_conv > 0.0f) ? GPIO_BSRR_BS1 : GPIO_BSRR_BR1;
+      // Only let ISR drive DIR when in ALGO ownership.
+      if (dir_src == DIR_SRC_ALGO)
+      {
+        // Fast: one write to BSRR (set or reset PB1) based on i_conv sign.
+        // (BS1 sets PB1; BR1 resets PB1).
+        GPIOB->BSRR = (i_conv > 0.0f) ? GPIO_BSRR_BS1 : GPIO_BSRR_BR1;
+      }
     }
   }
   else
