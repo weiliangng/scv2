@@ -395,8 +395,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
       g_can_rx.override_power = (settings & (1u << 3)) != 0u;
       g_can_rx.siphon_buffer = (settings & (1u << 4)) != 0u;
 
-      g_can_rx.can_power = (uint16_t)d[1] | ((uint16_t)d[2] << 8);
-      g_can_rx.can_buf = d[3];
+      g_can_rx.can_power = (uint16_t)d[1] | ((uint16_t)d[2] << 8);//can target power
+      g_can_rx.can_buf = d[3];//target buffer
 
       g_latest.p_set = (float)g_can_rx.can_power;//to be changed later
       continue;
