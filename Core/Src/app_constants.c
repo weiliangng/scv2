@@ -4,7 +4,7 @@
 #define B_VBUS_VALUE 0.0f            // V
 
 const uint32_t SCAP_STAT_ID = 0x077u;
-const uint32_t METER_ID = 0x215u;
+const uint32_t METER_ID = 0x215u;// to add 214,213
 const uint32_t SCAP_CMD_ID = 0x067u;
 const uint32_t SCAP_STAT_RATE_HZ = 1000u;
 
