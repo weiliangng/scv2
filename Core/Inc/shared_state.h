@@ -103,6 +103,13 @@ typedef struct
 extern volatile uart_rx_state_t g_uart_rx;
 
 /*
+ * Derived connection status flags (RX activity-based).
+ * Updated from the 1 kHz slow task.
+ */
+extern volatile bool g_can_connected;
+extern volatile bool g_uart_connected;
+
+/*
  * Control source for power-stage IO (SWEN/MODE/DIR).
  * When SRC_ALGO is selected, the fast DMA ISR controls DIR.
  */

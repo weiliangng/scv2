@@ -9,6 +9,9 @@
 #include "cmsis_os.h"
 #include "main.h"
 
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include "app_constants.h"
 #include "shared_state.h"
 #include "scap_io_owner.h"
@@ -52,6 +55,28 @@ static inline uint8_t clamp_u8(int32_t v)
   return (uint8_t)v;
 }
 
+static void update_rx_connection_status_1khz(void)
+{
+  const uint32_t now_ms = HAL_GetTick();
+
+  bool can_connected = false;
+  if (g_can_rx.can_rx_count != 0u)
+  {
+    const uint32_t last_ms = g_can_rx.last_can_tick;
+    can_connected = ((uint32_t)(now_ms - last_ms) <= CAN_RX_LINK_TIMEOUT_MS);
+  }
+  g_can_connected = can_connected;
+
+  bool uart_connected = false;
+  if (g_uart_rx.uart_rx_count != 0u)
+  {
+    const TickType_t now_ticks = xTaskGetTickCount();
+    const TickType_t last_ticks = (TickType_t)g_uart_rx.last_uart_tick;
+    uart_connected = ((TickType_t)(now_ticks - last_ticks) <= pdMS_TO_TICKS(UART_RX_LINK_TIMEOUT_MS));
+  }
+  g_uart_connected = uart_connected;
+}
+
 void TelemetrySlowAdcTask_Run(void const *argument)
 {
   (void)argument;
@@ -91,6 +116,7 @@ void TelemetrySlowAdcTask_Run(void const *argument)
   for (;;)
   {
     ScapIo_Tick1kHz();
+    update_rx_connection_status_1khz();
 
     const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
     const uint16_t n_adc_imonop = g_adc2_dma_buf[1] & 0x0FFFU;
