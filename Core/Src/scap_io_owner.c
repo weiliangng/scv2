@@ -58,16 +58,6 @@ static uint16_t g_swen_pulse_ms;
 static volatile uint16_t g_last_applied_pb;
 static uint16_t g_last_ext_md_dir;
 
-static inline uint16_t pb_mode_bits_current(void)
-{
-  uint16_t pb = g_last_applied_pb;
-  if (pb == 0xFFFFu)
-  {
-    pb = g_pb_algo;
-  }
-  return (uint16_t)(pb & PB_MODE_MASK);
-}
-
 void ScapIo_Init(void)
 {
   g_pb_manual = pb_pack(BIDIRECTIONAL, false, false);
@@ -149,16 +139,8 @@ void ScapIo_ManualSetSwen(bool swen_high)
 
 void ScapIo_CanRxUpdateIsr(bool swen_high, bool dir_high, bool can_manual)
 {
-  uint16_t pb = pb_mode_bits_current();
-  if (dir_high)
-  {
-    pb |= PB_DIR;
-  }
-  if (swen_high)
-  {
-    pb |= PB_SWEN;
-  }
-  g_pb_can = pb;
+  const scap_mode_t mode = can_manual ? UNIDIRECTIONAL : BIDIRECTIONAL;
+  g_pb_can = pb_pack(mode, dir_high, swen_high);
 
   /*
    * CAN policy bit selects controller ownership:
