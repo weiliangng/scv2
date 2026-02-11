@@ -111,13 +111,17 @@ static void update_p_set_1khz(void)
     const bool can_cmd_connected = (g_can_rx.can_rx_count != 0u) &&
                                    ((uint32_t)(now_ms - last_cmd_ms) <= CAN_CMD_TIMEOUT_MS);
 
-    if (g_can_rx.override_power && can_cmd_connected && ((src == SRC_ALGO) || (src == SRC_CAN)))
+    if (g_can_rx.mode && can_cmd_connected)
     {
       p_set_w = (float)g_can_rx.can_power;
     }
-    else if (((src == SRC_ALGO) || (src == SRC_CAN)) && g_uart_connected)
+    else if (g_uart_connected)
     {
       p_set_w = g_uart_rx.chassis_power_limit_w;
+    }
+    else if (can_cmd_connected)
+    {
+      p_set_w = (float)g_can_rx.can_power;
     }
     else
     {

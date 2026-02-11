@@ -55,8 +55,18 @@ static volatile uint16_t g_swen_pulse_req_ms;
 
 static uint16_t g_boot_settle_ms;
 static uint16_t g_swen_pulse_ms;
-static uint16_t g_last_applied_pb;
+static volatile uint16_t g_last_applied_pb;
 static uint16_t g_last_ext_md_dir;
+
+static inline uint16_t pb_mode_bits_current(void)
+{
+  uint16_t pb = g_last_applied_pb;
+  if (pb == 0xFFFFu)
+  {
+    pb = g_pb_algo;
+  }
+  return (uint16_t)(pb & PB_MODE_MASK);
+}
 
 void ScapIo_Init(void)
 {
@@ -137,21 +147,29 @@ void ScapIo_ManualSetSwen(bool swen_high)
   g_ctrl_src = SRC_MANUAL;
 }
 
-void ScapIo_CanRxUpdateIsr(bool swen_high, bool dir_high, bool mode_bit)
+void ScapIo_CanRxUpdateIsr(bool swen_high, bool dir_high, bool can_manual)
 {
-  const scap_mode_t mode = (mode_bit == false) ? BIDIRECTIONAL : UNIDIRECTIONAL;
-  g_pb_can = pb_pack(mode, dir_high, swen_high);
+  uint16_t pb = pb_mode_bits_current();
+  if (dir_high)
+  {
+    pb |= PB_DIR;
+  }
+  if (swen_high)
+  {
+    pb |= PB_SWEN;
+  }
+  g_pb_can = pb;
 
   /*
-   * CAN mode bit serves two purposes:
-   * - Select external MODE pins: 0=BIDIRECTIONAL, 1=UNIDIRECTIONAL
-   * - Select controller:         0=ALGO, 1=CAN
+   * CAN policy bit selects controller ownership:
+   * - 0: UART auto w/ CAN fallback (stay in ALGO)
+   * - 1: CAN manual control (CAN owns IO/DIR)
    *
    * Manual always has priority and cannot be preempted by CAN.
    */
   if (g_ctrl_src != SRC_MANUAL)
   {
-    g_ctrl_src = (mode_bit == false) ? SRC_ALGO : SRC_CAN;
+    g_ctrl_src = can_manual ? SRC_CAN : SRC_ALGO;
   }
 }
 
@@ -159,12 +177,18 @@ void ScapIo_Tick1kHz(void)
 {
   uint16_t pb = 0u;
   ctrl_src_t src = g_ctrl_src;
+  const uint32_t now_ms = HAL_GetTick();
+  bool can_cmd_connected = false;
+
+  if (g_can_rx.can_rx_count != 0u)
+  {
+    const uint32_t last_cmd_ms = g_can_rx.last_cmd_tick;
+    can_cmd_connected = ((uint32_t)(now_ms - last_cmd_ms) <= CAN_CMD_TIMEOUT_MS);
+  }
 
   if (src == SRC_CAN)
   {
-    const uint32_t now_ms = HAL_GetTick();
-    const uint32_t last_cmd_ms = g_can_rx.last_cmd_tick;
-    if ((uint32_t)(now_ms - last_cmd_ms) > CAN_CMD_TIMEOUT_MS)
+    if ((!can_cmd_connected) || (g_can_rx.mode == false))
     {
       g_ctrl_src = SRC_ALGO;
       src = SRC_ALGO;
@@ -192,6 +216,18 @@ void ScapIo_Tick1kHz(void)
     {
       ScapIo_RequestSwenPulseMs(SCAP_IO_DEFAULT_SWEN_PULSE_MS);
       g_last_ext_md_dir = md_dir;
+    }
+  }
+
+  if ((src != SRC_MANUAL) && can_cmd_connected)
+  {
+    if (g_can_rx.en)
+    {
+      pb |= PB_SWEN;
+    }
+    else
+    {
+      pb &= (uint16_t)~PB_SWEN;
     }
   }
 

@@ -421,14 +421,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
       g_can_rx.settings_raw = settings;
       g_can_rx.en = (settings & (1u << 0)) != 0u;//enable or disable swen
-      g_can_rx.mode = (settings & (1u << 1)) != 0u;//sets bidirectional( or unidirectional
-      g_can_rx.dir = (settings & (1u << 2)) != 0u;//only active in unidirectional mode, sets DIR pin
-      g_can_rx.override_power = (settings & (1u << 3)) != 0u; //0: listen to UART 1: listen to CAN (preferred)
-      g_can_rx.siphon_buffer = (settings & (1u << 4)) != 0u;//unused
+      g_can_rx.mode = (settings & (1u << 1)) != 0u;//control policy (0=UART auto, 1=CAN manual)
+      g_can_rx.dir = (settings & (1u << 2)) != 0u;//only active in CAN manual mode, forces DIR in HCM
 
       g_can_rx.last_cmd_tick = g_can_rx.last_can_tick;
-      g_can_rx.can_power = (uint16_t)d[1] | ((uint16_t)d[2] << 8);//alternate source of power limit if uart breaks down/override UART if overridepower is active
-      g_can_rx.can_buf = d[3];//alternate source of current buffer energy if uart breaks down
+      g_can_rx.can_power = (uint16_t)d[1] | ((uint16_t)d[2] << 8);//alternate source of power limit if UART breaks down/override UART if CAN manual
+      g_can_rx.can_buf = d[3];//alternate source of current buffer energy if UART breaks down
 
       ScapIo_CanRxUpdateIsr(g_can_rx.en, g_can_rx.dir, g_can_rx.mode);
       continue;

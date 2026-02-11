@@ -75,12 +75,10 @@ typedef struct
   uint32_t last_cmd_tick;
   uint32_t can_rx_count;
   uint8_t settings_raw;
-  uint16_t can_power;//
-  uint8_t can_buf;//
-  bool siphon_buffer;//yes(activate PID control) or no (Pset = chassis_power_limit_w)
-  bool override_power;//yes (Pset = Pset
-  bool mode;//
-  bool dir;//
+  uint16_t can_power;//alternate power limit source from CAN
+  uint8_t can_buf;//alternate buffer energy source from CAN
+  bool mode;//control policy: 0=UART auto w/ CAN fallback, 1=CAN manual control
+  bool dir;//only active in CAN manual mode (forces DIR in HCM)
   bool en;//enable switching
 } can_rx_state_t;
 

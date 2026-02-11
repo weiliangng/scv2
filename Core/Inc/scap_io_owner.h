@@ -31,4 +31,4 @@ void ScapIo_ManualSetMode(scap_mode_t mode);
 void ScapIo_ManualSetDir(bool dir_high);
 void ScapIo_ManualSetSwen(bool swen_high);
 
-void ScapIo_CanRxUpdateIsr(bool swen_high, bool dir_high, bool mode_bit);
+void ScapIo_CanRxUpdateIsr(bool swen_high, bool dir_high, bool can_manual);
