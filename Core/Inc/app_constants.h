@@ -56,6 +56,7 @@ extern uint32_t DAC3_CH2_BOOT_U12;
 void AppConstants_RecalcDerived(void);
 void AppConstants_ResetToDefaults(void);
 void AppConstants_InitFromNvm(void);
+bool AppConstants_LoadFromNvm(void);
 bool AppConstants_SaveToNvm(void);
 
 // Classic CAN (standard 11-bit IDs)

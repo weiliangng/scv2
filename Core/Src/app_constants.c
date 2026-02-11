@@ -152,85 +152,117 @@ void AppConstants_ResetToDefaults(void)
   AppConstants_RecalcDerived();
 }
 
-void AppConstants_InitFromNvm(void)
+bool AppConstants_LoadFromNvm(void)
 {
   uint32_t magic = 0, version = 0, seq_begin = 0, seq_end = 0;
 
-  AppConstants_ResetToDefaults();
-
   if (!NvmEeprom_ReadU32(EE_VA_MAGIC, &magic) || magic != APP_CONST_MAGIC)
   {
-    return;
+    return false;
   }
   if (!NvmEeprom_ReadU32(EE_VA_VERSION, &version) || version != APP_CONST_VERSION)
   {
-    return;
+    return false;
   }
   if (!NvmEeprom_ReadU32(EE_VA_SEQ_BEGIN, &seq_begin) || !NvmEeprom_ReadU32(EE_VA_SEQ_END, &seq_end) ||
       seq_begin == 0u || seq_begin != seq_end)
   {
-    return;
+    return false;
   }
 
   uint32_t tmp = 0;
 
   if (!NvmEeprom_ReadU32(EE_VA_A_VBUS, &tmp))
-    return;
-  A_VBUS = float_from_u32(tmp);
+    return false;
+  const float a_vbus = float_from_u32(tmp);
   if (!NvmEeprom_ReadU32(EE_VA_B_VBUS, &tmp))
-    return;
-  B_VBUS = float_from_u32(tmp);
+    return false;
+  const float b_vbus = float_from_u32(tmp);
   if (!NvmEeprom_ReadU32(EE_VA_A_ILOAD, &tmp))
-    return;
-  A_ILOAD = float_from_u32(tmp);
+    return false;
+  const float a_iload = float_from_u32(tmp);
   if (!NvmEeprom_ReadU32(EE_VA_B_ILOAD, &tmp))
-    return;
-  B_ILOAD = float_from_u32(tmp);
+    return false;
+  const float b_iload = float_from_u32(tmp);
   if (!NvmEeprom_ReadU32(EE_VA_MIDPOINT, &tmp))
-    return;
-  MIDPOINT = float_from_u32(tmp);
+    return false;
+  const float midpoint = float_from_u32(tmp);
 
   if (!NvmEeprom_ReadU32(EE_VA_A_INP, &tmp))
-    return;
-  A_INP = float_from_u32(tmp);
+    return false;
+  const float a_inp = float_from_u32(tmp);
   if (!NvmEeprom_ReadU32(EE_VA_B_INP, &tmp))
-    return;
-  B_INP = float_from_u32(tmp);
+    return false;
+  const float b_inp = float_from_u32(tmp);
   if (!NvmEeprom_ReadU32(EE_VA_A_INN, &tmp))
-    return;
-  A_INN = float_from_u32(tmp);
+    return false;
+  const float a_inn = float_from_u32(tmp);
   if (!NvmEeprom_ReadU32(EE_VA_B_INN, &tmp))
-    return;
-  B_INN = float_from_u32(tmp);
+    return false;
+  const float b_inn = float_from_u32(tmp);
 
   if (!NvmEeprom_ReadU32(EE_VA_A_VCAP, &tmp))
-    return;
-  A_VCAP = float_from_u32(tmp);
+    return false;
+  const float a_vcap = float_from_u32(tmp);
   if (!NvmEeprom_ReadU32(EE_VA_B_VCAP, &tmp))
-    return;
-  B_VCAP = float_from_u32(tmp);
+    return false;
+  const float b_vcap = float_from_u32(tmp);
 
   if (!NvmEeprom_ReadU32(EE_VA_A_OP, &tmp))
-    return;
-  A_OP = float_from_u32(tmp);
+    return false;
+  const float a_op = float_from_u32(tmp);
   if (!NvmEeprom_ReadU32(EE_VA_B_OP, &tmp))
-    return;
-  B_OP = float_from_u32(tmp);
+    return false;
+  const float b_op = float_from_u32(tmp);
   if (!NvmEeprom_ReadU32(EE_VA_A_ON, &tmp))
-    return;
-  A_ON = float_from_u32(tmp);
+    return false;
+  const float a_on = float_from_u32(tmp);
   if (!NvmEeprom_ReadU32(EE_VA_B_ON, &tmp))
-    return;
-  B_ON = float_from_u32(tmp);
+    return false;
+  const float b_on = float_from_u32(tmp);
 
   if (!NvmEeprom_ReadU32(EE_VA_DAC3_CH1_BOOT_U12, &tmp))
-    return;
-  DAC3_CH1_BOOT_U12 = tmp;
+    return false;
+  const uint32_t dac3_ch1_boot_u12 = tmp;
   if (!NvmEeprom_ReadU32(EE_VA_DAC3_CH2_BOOT_U12, &tmp))
-    return;
-  DAC3_CH2_BOOT_U12 = tmp;
+    return false;
+  const uint32_t dac3_ch2_boot_u12 = tmp;
+
+  if ((a_vbus == 0.0f) || (dac3_ch1_boot_u12 > 4095u) || (dac3_ch2_boot_u12 > 4095u))
+  {
+    return false;
+  }
+
+  A_VBUS = a_vbus;
+  B_VBUS = b_vbus;
+  A_ILOAD = a_iload;
+  B_ILOAD = b_iload;
+  MIDPOINT = midpoint;
+
+  A_INP = a_inp;
+  B_INP = b_inp;
+  A_INN = a_inn;
+  B_INN = b_inn;
+
+  A_VCAP = a_vcap;
+  B_VCAP = b_vcap;
+
+  A_OP = a_op;
+  B_OP = b_op;
+  A_ON = a_on;
+  B_ON = b_on;
+
+  DAC3_CH1_BOOT_U12 = dac3_ch1_boot_u12;
+  DAC3_CH2_BOOT_U12 = dac3_ch2_boot_u12;
 
   AppConstants_RecalcDerived();
+  return true;
+}
+
+void AppConstants_InitFromNvm(void)
+{
+  AppConstants_ResetToDefaults();
+  (void)AppConstants_LoadFromNvm();
 }
 
 bool AppConstants_SaveToNvm(void)

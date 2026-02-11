@@ -9,10 +9,12 @@
 #include "task_dbg_over_usb.h"
 
 #include "main.h"
+#include "app_constants.h"
 #include "scap_io_owner.h"
 
 #include <ctype.h>
 #include <errno.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -117,6 +119,27 @@ static int usbcli_parse_u32(const char *s, uint32_t *out)
   return 1;
 }
 
+static int usbcli_parse_f32(const char *s, float *out)
+{
+  char *endp = NULL;
+  float val;
+
+  if ((s == NULL) || (out == NULL))
+  {
+    return 0;
+  }
+
+  errno = 0;
+  val = strtof(s, &endp);
+  if ((errno != 0) || (endp == s) || (endp == NULL) || (*endp != '\0') || (!isfinite(val)))
+  {
+    return 0;
+  }
+
+  *out = val;
+  return 1;
+}
+
 static int usbcli_parse_gpio_pin(const char *s, GPIO_TypeDef **port, uint16_t *pin)
 {
   size_t idx = 0U;
@@ -194,6 +217,57 @@ static int usbcli_parse_gpio_pin(const char *s, GPIO_TypeDef **port, uint16_t *p
   return 1;
 }
 
+static void usbcli_print_f32_6dp(const char *name, float v)
+{
+  if (name == NULL)
+  {
+    return;
+  }
+
+  if (!isfinite(v))
+  {
+    usbcli_printf("%s=nan\r\n", name);
+    return;
+  }
+
+  const bool neg = (v < 0.0f);
+  const float av = neg ? -v : v;
+  long ip = (long)av;
+  unsigned long fp = (unsigned long)(((av - (float)ip) * 1000000.0f) + 0.5f);
+  if (fp >= 1000000UL)
+  {
+    ip += 1L;
+    fp -= 1000000UL;
+  }
+
+  usbcli_printf("%s=%s%ld.%06lu\r\n", name, neg ? "-" : "", ip, fp);
+}
+
+static void usbcli_print_cal_current(void)
+{
+  usbcli_print_f32_6dp("A_VBUS", A_VBUS);
+  usbcli_print_f32_6dp("B_VBUS", B_VBUS);
+  usbcli_print_f32_6dp("A_ILOAD", A_ILOAD);
+  usbcli_print_f32_6dp("B_ILOAD", B_ILOAD);
+  usbcli_print_f32_6dp("MIDPOINT", MIDPOINT);
+
+  usbcli_print_f32_6dp("A_INP", A_INP);
+  usbcli_print_f32_6dp("B_INP", B_INP);
+  usbcli_print_f32_6dp("A_INN", A_INN);
+  usbcli_print_f32_6dp("B_INN", B_INN);
+
+  usbcli_print_f32_6dp("A_VCAP", A_VCAP);
+  usbcli_print_f32_6dp("B_VCAP", B_VCAP);
+
+  usbcli_print_f32_6dp("A_OP", A_OP);
+  usbcli_print_f32_6dp("B_OP", B_OP);
+  usbcli_print_f32_6dp("A_ON", A_ON);
+  usbcli_print_f32_6dp("B_ON", B_ON);
+
+  usbcli_printf("DAC3_CH1_BOOT_U12=%lu\r\n", (unsigned long)DAC3_CH1_BOOT_U12);
+  usbcli_printf("DAC3_CH2_BOOT_U12=%lu\r\n", (unsigned long)DAC3_CH2_BOOT_U12);
+}
+
 static void usbcli_cmd_help(void)
 {
   static const char help[] =
@@ -207,7 +281,10 @@ static void usbcli_cmd_help(void)
       "  dir <0|1>\r\n"
       "  gpio write <PA10|PB1|...> <0|1>\r\n"
       "  gpio toggle <PA10|PB1|...>\r\n"
-      "  dac set <1|3> <1|2> <0..4095>\r\n";
+      "  dac set <1|3> <1|2> <0..4095>\r\n"
+      "  cal set <NAME> <VALUE>\r\n"
+      "  cal load\r\n"
+      "  cal save\r\n";
   usbcli_puts(help);
 }
 
@@ -501,6 +578,262 @@ static void usbcli_cmd_dac(int argc, char **argv)
   usbcli_printf("ok\r\n");
 }
 
+static void usbcli_cmd_cal(int argc, char **argv)
+{
+  if (argc < 2)
+  {
+    usbcli_printf("usage: cal set <NAME> <VALUE> | cal load | cal save\r\n");
+    return;
+  }
+
+  if (usbcli_streq(argv[1], "save"))
+  {
+    if (AppConstants_SaveToNvm())
+    {
+      usbcli_printf("ok\r\n");
+    }
+    else
+    {
+      usbcli_printf("err: save failed\r\n");
+    }
+    return;
+  }
+
+  if (usbcli_streq(argv[1], "load"))
+  {
+    if (AppConstants_LoadFromNvm())
+    {
+      (void)HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_1, DAC_ALIGN_12B_R, DAC3_CH1_BOOT_U12);
+      (void)HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_2, DAC_ALIGN_12B_R, DAC3_CH2_BOOT_U12);
+      usbcli_printf("loaded:\r\n");
+      usbcli_print_cal_current();
+      usbcli_printf("ok\r\n");
+    }
+    else
+    {
+      usbcli_printf("err: no valid saved cal\r\n");
+    }
+    return;
+  }
+
+  if (usbcli_streq(argv[1], "set"))
+  {
+    if (argc < 4)
+    {
+      usbcli_printf("usage: cal set <NAME> <VALUE>\r\n");
+      return;
+    }
+
+    const char *name = argv[2];
+    const char *val_s = argv[3];
+
+    float f = 0.0f;
+    uint32_t u = 0u;
+
+    if (usbcli_streq(name, "A_VBUS"))
+    {
+      if ((!usbcli_parse_f32(val_s, &f)) || (f == 0.0f))
+      {
+        usbcli_printf("err: A_VBUS must be finite and nonzero\r\n");
+        return;
+      }
+      A_VBUS = f;
+      AppConstants_RecalcDerived();
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "B_VBUS"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      B_VBUS = f;
+      AppConstants_RecalcDerived();
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "A_ILOAD"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      A_ILOAD = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "B_ILOAD"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      B_ILOAD = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "MIDPOINT"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      MIDPOINT = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+
+    if (usbcli_streq(name, "A_INP"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      A_INP = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "B_INP"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      B_INP = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "A_INN"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      A_INN = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "B_INN"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      B_INN = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+
+    if (usbcli_streq(name, "A_VCAP"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      A_VCAP = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "B_VCAP"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      B_VCAP = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+
+    if (usbcli_streq(name, "A_OP"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      A_OP = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "B_OP"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      B_OP = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "A_ON"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      A_ON = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "B_ON"))
+    {
+      if (!usbcli_parse_f32(val_s, &f))
+      {
+        usbcli_printf("err: invalid float\r\n");
+        return;
+      }
+      B_ON = f;
+      usbcli_printf("ok\r\n");
+      return;
+    }
+
+    if (usbcli_streq(name, "DAC3_CH1_BOOT_U12"))
+    {
+      if ((!usbcli_parse_u32(val_s, &u)) || (u > 4095u))
+      {
+        usbcli_printf("err: DAC3_CH1_BOOT_U12 must be 0..4095\r\n");
+        return;
+      }
+      DAC3_CH1_BOOT_U12 = u;
+      (void)HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_1, DAC_ALIGN_12B_R, DAC3_CH1_BOOT_U12);
+      usbcli_printf("ok\r\n");
+      return;
+    }
+    if (usbcli_streq(name, "DAC3_CH2_BOOT_U12"))
+    {
+      if ((!usbcli_parse_u32(val_s, &u)) || (u > 4095u))
+      {
+        usbcli_printf("err: DAC3_CH2_BOOT_U12 must be 0..4095\r\n");
+        return;
+      }
+      DAC3_CH2_BOOT_U12 = u;
+      (void)HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_2, DAC_ALIGN_12B_R, DAC3_CH2_BOOT_U12);
+      usbcli_printf("ok\r\n");
+      return;
+    }
+
+    usbcli_printf("err: unknown cal name '%s'\r\n", name);
+    usbcli_printf("names: A_VBUS B_VBUS A_ILOAD B_ILOAD MIDPOINT A_INP B_INP A_INN B_INN A_VCAP B_VCAP A_OP B_OP A_ON B_ON DAC3_CH1_BOOT_U12 DAC3_CH2_BOOT_U12\r\n");
+    return;
+  }
+
+  usbcli_printf("usage: cal set <NAME> <VALUE> | cal load | cal save\r\n");
+}
+
 static void usbcli_handle_line(struct embedded_cli *cli)
 {
   char **argv = NULL;
@@ -545,6 +878,10 @@ static void usbcli_handle_line(struct embedded_cli *cli)
   else if (usbcli_streq(argv[0], "dac"))
   {
     usbcli_cmd_dac(argc, argv);
+  }
+  else if (usbcli_streq(argv[0], "cal"))
+  {
+    usbcli_cmd_cal(argc, argv);
   }
   else
   {
