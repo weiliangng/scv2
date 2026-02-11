@@ -56,11 +56,16 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/telemetry_slow_adc_task.c
     Core/Src/referee_uart.c
     Core/Src/scap_io_owner.c
+    Core/Src/nvm_eeprom.c
+    Middlewares/ST/EEPROM_Emul/Core/eeprom_emul.c
+    Middlewares/ST/EEPROM_Emul/Porting/STM32G4/flash_interface.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    ${CMAKE_SOURCE_DIR}/Middlewares/ST/EEPROM_Emul/Core
+    ${CMAKE_SOURCE_DIR}/Middlewares/ST/EEPROM_Emul/Porting/STM32G4
 )
 
 # Add project symbols (macros)

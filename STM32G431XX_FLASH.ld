@@ -62,7 +62,9 @@ _Min_Stack_Size = 0x400; /* required amount of stack */
 MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 32K
-FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 128K
+/* Reserve the last 8KB of flash for EEPROM emulation (4 pages @ 2KB/page). */
+FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 128K - 8K
+EEPROM_EMUL (rx) : ORIGIN = 0x0801E000, LENGTH = 8K
 }
 
 /* Define output sections */

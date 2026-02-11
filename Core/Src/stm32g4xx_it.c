@@ -29,6 +29,7 @@
 #include "shared_state.h"
 #include "scap_io_owner.h"
 #include "referee_uart.h"
+#include "eeprom_emul.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -83,6 +84,10 @@ extern UART_HandleTypeDef huart3;
 extern TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN EV */
+/* During the cleanup phase in EE_Init, AddressRead is the address being read */
+extern __IO uint32_t AddressRead;
+/* Flag equal to 1 when the cleanup phase is in progress, 0 if not */
+extern __IO uint8_t CleanupPhase;
 
 /* USER CODE END EV */
 
@@ -98,7 +103,35 @@ void NMI_Handler(void)
 
   /* USER CODE END NonMaskableInt_IRQn 0 */
   /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
-   while (1)
+  if (__HAL_FLASH_GET_FLAG(FLASH_FLAG_ECCD))
+  {
+    if (CleanupPhase == 1U)
+    {
+      if ((AddressRead >= START_PAGE_ADDRESS) && (AddressRead <= END_EEPROM_ADDRESS))
+      {
+        if (EE_DeleteCorruptedFlashAddress((uint32_t)AddressRead) == EE_OK)
+        {
+          return;
+        }
+
+        if (__HAL_FLASH_GET_FLAG(FLASH_FLAG_PROGERR) && __HAL_FLASH_GET_FLAG(FLASH_FLAG_PGAERR) &&
+            __HAL_FLASH_GET_FLAG(FLASH_FLAG_PGSERR))
+        {
+          __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_PROGERR);
+          __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_PGAERR);
+          __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_PGSERR);
+          return;
+        }
+      }
+    }
+    else
+    {
+      __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ECCD);
+      return;
+    }
+  }
+
+  while (1)
   {
   }
   /* USER CODE END NonMaskableInt_IRQn 1 */

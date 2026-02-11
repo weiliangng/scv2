@@ -31,6 +31,7 @@
 #include "shared_state.h"
 #include "telemetry_slow_adc_task.h"
 #include "referee_uart.h"
+#include "nvm_eeprom.h"
 
 /* USER CODE END Includes */
 
@@ -163,6 +164,8 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+  (void)NvmEeprom_Init();
+  AppConstants_InitFromNvm();
 
   /* USER CODE END SysInit */
 
