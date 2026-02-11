@@ -1,9 +1,9 @@
 #include "scap_io_owner.h"
 
+#include "app_constants.h"
 #include "main.h"
 
 #define SCAP_IO_BOOT_SETTLE_MS 20u
-#define SCAP_IO_CAN_TIMEOUT_MS 500u
 #define SCAP_IO_DEFAULT_SWEN_PULSE_MS 5u
 
 #define PB_DIR GPIO_DIR_Pin
@@ -164,7 +164,7 @@ void ScapIo_Tick1kHz(void)
   {
     const uint32_t now_ms = HAL_GetTick();
     const uint32_t last_cmd_ms = g_can_rx.last_cmd_tick;
-    if ((uint32_t)(now_ms - last_cmd_ms) > SCAP_IO_CAN_TIMEOUT_MS)
+    if ((uint32_t)(now_ms - last_cmd_ms) > CAN_CMD_TIMEOUT_MS)
     {
       g_ctrl_src = SRC_ALGO;
       src = SRC_ALGO;

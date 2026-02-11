@@ -276,6 +276,7 @@ static void usbcli_cmd_help(void)
       "  status\r\n"
       "  telemetry on|off|toggle\r\n"
       "  ctrl <algo|can|manual>\r\n"
+      "  pset <0..240>\r\n"
       "  swen <0|1>\r\n"
       "  mode <ccm|hcm|dcm|burst>\r\n"
       "  dir <0|1>\r\n"
@@ -325,6 +326,10 @@ static void usbcli_cmd_status(void)
                 (long)i_load_mA,
                 (long)i_out_mA,
                 (long)i_conv_mA);
+
+  const float p_set = g_latest.p_set;
+  const int32_t p_set_w = (int32_t)(p_set + ((p_set >= 0.0f) ? 0.5f : -0.5f));
+  usbcli_printf("p_set_W=%ld\r\n", (long)p_set_w);
 }
 
 static void usbcli_cmd_telemetry(int argc, char **argv)
@@ -385,6 +390,26 @@ static int usbcli_parse_mode(const char *s, scap_mode_t *out)
   }
 
   return 0;
+}
+
+static void usbcli_cmd_pset(int argc, char **argv)
+{
+  if (argc < 2)
+  {
+    usbcli_printf("usage: pset <0..240>\r\n");
+    return;
+  }
+
+  uint32_t w = 0u;
+  if ((!usbcli_parse_u32(argv[1], &w)) || (w > 240u))
+  {
+    usbcli_printf("usage: pset <0..240>\r\n");
+    return;
+  }
+
+  g_manual_p_set_w = (float)w;
+  g_ctrl_src = SRC_MANUAL;
+  usbcli_printf("ok\r\n");
 }
 
 static void usbcli_cmd_ctrl(int argc, char **argv)
@@ -858,6 +883,10 @@ static void usbcli_handle_line(struct embedded_cli *cli)
   else if (usbcli_streq(argv[0], "ctrl"))
   {
     usbcli_cmd_ctrl(argc, argv);
+  }
+  else if (usbcli_streq(argv[0], "pset"))
+  {
+    usbcli_cmd_pset(argc, argv);
   }
   else if (usbcli_streq(argv[0], "swen"))
   {

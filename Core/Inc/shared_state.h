@@ -22,10 +22,16 @@ typedef struct
   float i_out_n;
   float i_conv;
   float p_load;
-  float p_set;//multiple writers detected
+  float p_set;
 } latest_values_t;
 
 extern volatile latest_values_t g_latest;
+
+/*
+ * Manual CLI "requested power" mailbox.
+ * Resolved into `g_latest.p_set` by the slow 1 kHz task based on priority.
+ */
+extern volatile float g_manual_p_set_w;
 
 /*
  * Supercap state/telemetry constants.

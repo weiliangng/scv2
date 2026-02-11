@@ -11,6 +11,7 @@ const uint32_t SCAP_STAT_RATE_HZ = 1000u;
 
 const uint32_t CAN_RX_LINK_TIMEOUT_MS = 500u;
 const uint32_t UART_RX_LINK_TIMEOUT_MS = 1000u;
+const uint32_t CAN_CMD_TIMEOUT_MS = 500u;
 
 const uint32_t VREF_MV = 3300u; // mV (currently unused)
 

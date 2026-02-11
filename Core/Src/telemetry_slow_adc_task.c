@@ -16,6 +16,10 @@
 #include "shared_state.h"
 #include "scap_io_owner.h"
 
+#define P_SET_DEFAULT_W 50.0f
+#define P_SET_MIN_W 0.0f
+#define P_SET_MAX_W 240.0f
+
 static inline uint16_t clamp_u16(int32_t v)
 {
   if (v < 0)
@@ -55,6 +59,19 @@ static inline uint8_t clamp_u8(int32_t v)
   return (uint8_t)v;
 }
 
+static inline float clamp_p_set_w(float p_w)
+{
+  if (p_w < P_SET_MIN_W)
+  {
+    return P_SET_MIN_W;
+  }
+  if (p_w > P_SET_MAX_W)
+  {
+    return P_SET_MAX_W;
+  }
+  return p_w;
+}
+
 static void update_rx_connection_status_1khz(void)
 {
   const uint32_t now_ms = HAL_GetTick();
@@ -75,6 +92,40 @@ static void update_rx_connection_status_1khz(void)
     uart_connected = ((TickType_t)(now_ticks - last_ticks) <= pdMS_TO_TICKS(UART_RX_LINK_TIMEOUT_MS));
   }
   g_uart_connected = uart_connected;
+}
+
+static void update_p_set_1khz(void)
+{
+  float p_set_w = P_SET_DEFAULT_W;
+
+  const ctrl_src_t src = g_ctrl_src;
+  if (src == SRC_MANUAL)
+  {
+    p_set_w = g_manual_p_set_w;
+  }
+  else
+  {
+    const uint32_t now_ms = HAL_GetTick();
+
+    const uint32_t last_cmd_ms = g_can_rx.last_cmd_tick;
+    const bool can_cmd_connected = (g_can_rx.can_rx_count != 0u) &&
+                                   ((uint32_t)(now_ms - last_cmd_ms) <= CAN_CMD_TIMEOUT_MS);
+
+    if (g_can_rx.override_power && can_cmd_connected && ((src == SRC_ALGO) || (src == SRC_CAN)))
+    {
+      p_set_w = (float)g_can_rx.can_power;
+    }
+    else if (((src == SRC_ALGO) || (src == SRC_CAN)) && g_uart_connected)
+    {
+      p_set_w = g_uart_rx.chassis_power_limit_w;
+    }
+    else
+    {
+      p_set_w = P_SET_DEFAULT_W;
+    }
+  }
+
+  g_latest.p_set = clamp_p_set_w(p_set_w);
 }
 
 void TelemetrySlowAdcTask_Run(void const *argument)
@@ -117,6 +168,7 @@ void TelemetrySlowAdcTask_Run(void const *argument)
   {
     ScapIo_Tick1kHz();
     update_rx_connection_status_1khz();
+    update_p_set_1khz();
 
     const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
     const uint16_t n_adc_imonop = g_adc2_dma_buf[1] & 0x0FFFU;

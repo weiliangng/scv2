@@ -4,6 +4,8 @@ volatile latest_values_t g_latest = {
     .p_set = 50.0f,
 };
 
+volatile float g_manual_p_set_w = 50.0f;
+
 volatile float meter_v = 0.0f;
 volatile float meter_i = 0.0f;
 

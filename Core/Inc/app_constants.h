@@ -70,4 +70,8 @@ extern const uint32_t SCAP_STAT_RATE_HZ; // 10..1000
 extern const uint32_t CAN_RX_LINK_TIMEOUT_MS;
 extern const uint32_t UART_RX_LINK_TIMEOUT_MS;
 
+// CAN command freshness timeout (based on `g_can_rx.last_cmd_tick`).
+// Used for CAN IO ownership + CAN P_set override eligibility.
+extern const uint32_t CAN_CMD_TIMEOUT_MS;
+
 #endif /* APP_CONSTANTS_H */
