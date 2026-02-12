@@ -32,6 +32,7 @@
 #include "telemetry_slow_adc_task.h"
 #include "referee_uart.h"
 #include "nvm_eeprom.h"
+#include "stm32g4xx_ll_dac.h"
 
 /* USER CODE END Includes */
 
@@ -136,6 +137,8 @@ static void AppDac3_InitDefaults(void)
 {
   (void)HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_1, DAC_ALIGN_12B_R, DAC3_CH1_BOOT_U12);
   (void)HAL_DAC_SetValue(&hdac3, DAC_CHANNEL_2, DAC_ALIGN_12B_R, DAC3_CH2_BOOT_U12);
+  (void)HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 2500u);
+  (void)HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, 2500u);
 }
 
 /* USER CODE END 0 */
@@ -269,6 +272,7 @@ int main(void)
   {
     Error_Handler();
   }
+
 
   /* USER CODE END 2 */
 

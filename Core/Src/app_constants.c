@@ -38,7 +38,7 @@ static const float DEFAULT_B_OP = -10.0f;          // A
 static const float DEFAULT_A_ON = -0.00829074903f; // A/count
 static const float DEFAULT_B_ON = 10.0f;           // A
 
-static const uint32_t DEFAULT_DAC3_CH1_BOOT_U12 = 2048u;
+static const uint32_t DEFAULT_DAC3_CH1_BOOT_U12 = 920u;
 static const uint32_t DEFAULT_DAC3_CH2_BOOT_U12 = 3723u;
 
 float A_VBUS = 0.009654528478f; // V/count
