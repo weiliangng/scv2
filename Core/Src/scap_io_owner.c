@@ -60,9 +60,9 @@ static uint16_t g_last_ext_md_dir;
 
 void ScapIo_Init(void)
 {
-  g_pb_manual = pb_pack(BIDIRECTIONAL, false, false);
-  g_pb_can = pb_pack(BIDIRECTIONAL, false, false);
-  g_pb_algo = pb_pack(BIDIRECTIONAL, false, true);
+  g_pb_manual = pb_pack(UNIDIRECTIONAL, true, false);
+  g_pb_can = pb_pack(UNIDIRECTIONAL, true, false);
+  g_pb_algo = pb_pack(UNIDIRECTIONAL, true, false);
 
   g_fault_latched = 0u;
   g_swen_pulse_req_ms = 0u;
