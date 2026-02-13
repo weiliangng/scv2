@@ -23,11 +23,11 @@ static const float DEFAULT_A_ILOAD = 0.008058608059f * 2.0f; // A/count
 static const float DEFAULT_B_ILOAD = -16.5f * 2.0f;          // A
 static const float DEFAULT_MIDPOINT = 2047.5f;               // count
 
-static const float DEFAULT_A_INP = 2754.776956f;   // counts
-static const float DEFAULT_B_INP = -124.090909f;   // counts/A
+static const float DEFAULT_A_INP =  2628.75f;   // counts
+static const float DEFAULT_B_INP = -131.53f;   // counts/A
 
-static const float DEFAULT_A_INN = 2754.776956f;   // counts
-static const float DEFAULT_B_INN = 124.090909f;    // counts/A
+static const float DEFAULT_A_INN = 2797.48f;   // counts
+static const float DEFAULT_B_INN = 127.92f;    // counts/A
 
 static const float DEFAULT_A_VCAP = 0.009654528478f; // V/count
 static const float DEFAULT_B_VCAP = 0.0f;            // V

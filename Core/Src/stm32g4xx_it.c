@@ -265,8 +265,8 @@ void DMA1_Channel1_IRQHandler(void)
 
 
 
-    const uint16_t n_dac_p = clamp_u12((int32_t)(A_INP + (i_conv * B_INP)));
-    const uint16_t n_dac_n = clamp_u12((int32_t)(A_INN + (i_conv * B_INN)));
+    uint16_t n_dac_p = clamp_u12((int32_t)(A_INP + (i_conv * B_INP)));
+    uint16_t n_dac_n = clamp_u12((int32_t)(A_INN + (i_conv * B_INN)));
 
     g_latest.v_bus = v_bus;
     g_latest.v_cap = v_cap;
@@ -276,10 +276,14 @@ void DMA1_Channel1_IRQHandler(void)
     const ctrl_src_t ctrl_src = g_ctrl_src;
     if (ctrl_src == SRC_ALGO)
     {
-      LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);
-      // Fast: one write to BSRR (set or reset PB1) based on i_conv sign.
-      // (BS1 sets PB1; BR1 resets PB1).
-      GPIOB->BSRR = (i_conv > 0.0f) ? GPIO_BSRR_BS1 : GPIO_BSRR_BR1;
+      if (i_conv > 0.0f) {
+        GPIOB->BSRR = GPIO_BSRR_BS1;
+        n_dac_n -= 200u;
+      } else {
+        GPIOB->BSRR = GPIO_BSRR_BR1;
+        n_dac_p -= 200u;
+      }
+      LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);//flipped
     }
   }
   else
