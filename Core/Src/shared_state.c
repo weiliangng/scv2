@@ -27,5 +27,5 @@ volatile uart_rx_state_t g_uart_rx;
 volatile bool g_can_connected;
 volatile bool g_uart_connected;
 
-volatile ctrl_src_t g_ctrl_src = SRC_ALGO;
+volatile ctrl_src_t g_ctrl_src = SRC_MANUAL;
 volatile bool g_telemetry_enabled = true;

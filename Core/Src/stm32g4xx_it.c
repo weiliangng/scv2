@@ -276,7 +276,7 @@ void DMA1_Channel1_IRQHandler(void)
     const ctrl_src_t ctrl_src = g_ctrl_src;
     if (ctrl_src == SRC_ALGO)
     {
-      LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_p, n_dac_n);
+      LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);
       // Fast: one write to BSRR (set or reset PB1) based on i_conv sign.
       // (BS1 sets PB1; BR1 resets PB1).
       GPIOB->BSRR = (i_conv > 0.0f) ? GPIO_BSRR_BS1 : GPIO_BSRR_BR1;

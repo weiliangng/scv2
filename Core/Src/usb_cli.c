@@ -291,6 +291,14 @@ static void usbcli_cmd_help(void)
 
 static void usbcli_cmd_status(void)
 {
+  const uint32_t dac1_1_u12 = (uint32_t)(HAL_DAC_GetValue(&hdac1, DAC_CHANNEL_1) & 0x0FFFu);
+  const uint32_t dac1_2_u12 = (uint32_t)(HAL_DAC_GetValue(&hdac1, DAC_CHANNEL_2) & 0x0FFFu);
+  const uint32_t dac3_1_u12 = (uint32_t)(HAL_DAC_GetValue(&hdac3, DAC_CHANNEL_1) & 0x0FFFu);
+
+  const uint32_t dac1_1_mV = (uint32_t)((dac1_1_u12 * 3300u + 2047u) / 4095u);
+  const uint32_t dac1_2_mV = (uint32_t)((dac1_2_u12 * 3300u + 2047u) / 4095u);
+  const uint32_t dac3_1_mV = (uint32_t)((dac3_1_u12 * 3300u + 2047u) / 4095u);
+
   const char *src = "unknown";
   switch (g_ctrl_src)
   {
@@ -303,13 +311,19 @@ static void usbcli_cmd_status(void)
     break;
   }
 
-  usbcli_printf("telemetry=%s ctrl=%s swen=%u mode=%u%u dir=%u\r\n",
+  usbcli_printf("telemetry=%s ctrl=%s swen=%u mode=%u%u dir=%u dac1_1_u12=%lu dac1_1_mV=%lu dac1_2_u12=%lu dac1_2_mV=%lu dac3_1_u12=%lu dac3_1_mV=%lu\r\n",
                 g_telemetry_enabled ? "on" : "off",
                 src,
                 (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_SWEN_Pin) != GPIO_PIN_RESET) ? 1u : 0u),
                 (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_MODEMSB_Pin) != GPIO_PIN_RESET) ? 1u : 0u),
                 (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_MODELSB_Pin) != GPIO_PIN_RESET) ? 1u : 0u),
-                (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_DIR_Pin) != GPIO_PIN_RESET) ? 1u : 0u));
+                (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_DIR_Pin) != GPIO_PIN_RESET) ? 1u : 0u),
+                (unsigned long)dac1_1_u12,
+                (unsigned long)dac1_1_mV,
+                (unsigned long)dac1_2_u12,
+                (unsigned long)dac1_2_mV,
+                (unsigned long)dac3_1_u12,
+                (unsigned long)dac3_1_mV);
 
   const int32_t v_bus_mV = (int32_t)(g_latest.v_bus * 1000.0f);
   const int32_t v_cap_mV = (int32_t)(g_latest.v_cap * 1000.0f);
