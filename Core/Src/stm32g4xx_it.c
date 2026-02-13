@@ -278,10 +278,10 @@ void DMA1_Channel1_IRQHandler(void)
     {
       if (i_conv > 0.0f) {
         GPIOB->BSRR = GPIO_BSRR_BS1;
-        n_dac_n -= 200u;
+        n_dac_n = n_dac_p;
       } else {
         GPIOB->BSRR = GPIO_BSRR_BR1;
-        n_dac_p -= 200u;
+        n_dac_p = n_dac_n;
       }
       LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);//flipped
     }
