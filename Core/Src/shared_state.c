@@ -14,6 +14,7 @@ const float V_cap_max = 26.3f;
 
 volatile uint32_t g_dma1_ch1_irq_cycles_last;
 volatile uint32_t g_dma1_ch1_irq_cycles_max;
+volatile uint32_t g_adc_seq_count;
 
 /* See `Core/Inc/shared_state.h` for buffer index meanings. */
 volatile uint16_t g_adc1_dma_buf[2];

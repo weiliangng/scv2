@@ -47,6 +47,13 @@ extern volatile uint32_t g_dma1_ch1_irq_cycles_last;
 extern volatile uint32_t g_dma1_ch1_irq_cycles_max;
 
 /*
+ * ADC trigger/sequence counter (increments once per ADC trigger).
+ * Implementation detail: incremented from the ADC1 DMA TC ISR (DMA1 CH1),
+ * which fires once per TIM2 TRGO -> ADC regular sequence completion.
+ */
+extern volatile uint32_t g_adc_seq_count;
+
+/*
  * ADC DMA buffers updated by hardware/DMA and consumed in ISR/task contexts.
  */
 /*

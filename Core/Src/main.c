@@ -1182,6 +1182,9 @@ void StartTelemetryTask(void const * argument)
   /* USER CODE BEGIN StartTelemetryTask */
   /* Infinite loop */
   static uint32_t hello_seq = 0U;
+  static uint32_t last_adc_rate_ms = 0U;
+  static uint32_t last_adc_seq_count = 0U;
+  static uint32_t adc_seq_hz = 0U;
   char msg[320];
   for(;;)
   {
@@ -1189,6 +1192,28 @@ void StartTelemetryTask(void const * argument)
     {
       osDelay(50);
       continue;
+    }
+
+    const uint32_t now_ms = HAL_GetTick();
+    if (last_adc_rate_ms == 0U)
+    {
+      last_adc_rate_ms = now_ms;
+      last_adc_seq_count = g_adc_seq_count;
+    }
+    else
+    {
+      const uint32_t dt_ms = (uint32_t)(now_ms - last_adc_rate_ms);
+      if (dt_ms >= 1000U)
+      {
+        const uint32_t seq_count_now = g_adc_seq_count;
+        const uint32_t dseq = (uint32_t)(seq_count_now - last_adc_seq_count);
+        if (dt_ms != 0U)
+        {
+          adc_seq_hz = (uint32_t)((dseq * 1000U + (dt_ms / 2U)) / dt_ms);
+        }
+        last_adc_rate_ms = now_ms;
+        last_adc_seq_count = seq_count_now;
+      }
     }
 
     const float v_bus = g_latest.v_bus;
@@ -1223,7 +1248,7 @@ void StartTelemetryTask(void const * argument)
     const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld uart_rx=%lu can_rx=%lu uart_up=%lu can_up=%lu wm_v_mV=%ld wm_i_mA=%ld dlast=%lu dmax=%lu\r\n",
+                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld uart_rx=%lu can_rx=%lu uart_up=%lu can_up=%lu wm_v_mV=%ld wm_i_mA=%ld adc_hz=%lu dlast=%lu dmax=%lu\r\n",
                        (unsigned long)hello_seq++,
                        (long)v_bus_mV,
                        (long)v_cap_mV,
@@ -1240,6 +1265,7 @@ void StartTelemetryTask(void const * argument)
                        (unsigned long)can_up,
                        (long)wm_v_mV,
                        (long)wm_i_mA,
+                       (unsigned long)adc_seq_hz,
                        (unsigned long)dma1_ch1_cycles_last,
                        (unsigned long)dma1_ch1_cycles_max);
     dbg_write((const uint8_t *)msg, (uint16_t)len);
