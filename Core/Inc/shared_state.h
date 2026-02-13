@@ -60,6 +60,14 @@ extern volatile uint32_t g_adc_seq_count;
 extern volatile bool g_is_safe;
 
 /*
+ * Telemetry helpers computed in task context.
+ * - g_adc_seq_hz: estimated ADC trigger/sequence rate (Hz).
+ * - g_telemetry_seq: sequence counter for USB telemetry frames.
+ */
+extern volatile uint32_t g_adc_seq_hz;
+extern volatile uint32_t g_telemetry_seq;
+
+/*
  * ADC DMA buffers updated by hardware/DMA and consumed in ISR/task contexts.
  */
 /*

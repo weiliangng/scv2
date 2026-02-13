@@ -16,6 +16,8 @@ volatile uint32_t g_dma1_ch1_irq_cycles_last;
 volatile uint32_t g_dma1_ch1_irq_cycles_max;
 volatile uint32_t g_adc_seq_count;
 volatile bool g_is_safe;
+volatile uint32_t g_adc_seq_hz;
+volatile uint32_t g_telemetry_seq;
 
 /* See `Core/Inc/shared_state.h` for buffer index meanings. */
 volatile uint16_t g_adc1_dma_buf[2];

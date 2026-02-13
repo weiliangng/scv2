@@ -1215,6 +1215,8 @@ void StartTelemetryTask(void const * argument)
         last_adc_seq_count = seq_count_now;
       }
     }
+    g_adc_seq_hz = adc_seq_hz;
+    g_telemetry_seq = hello_seq;
 
     const float v_bus = g_latest.v_bus;
     const float v_cap = g_latest.v_cap;

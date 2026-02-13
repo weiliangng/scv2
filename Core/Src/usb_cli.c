@@ -291,6 +291,58 @@ static void usbcli_cmd_help(void)
 
 static void usbcli_cmd_status(void)
 {
+  enum
+  {
+    STATUS_AVG_SAMPLES = 1000,
+    STATUS_AVG_DELAY_MS = 1,
+  };
+
+  int64_t sum_v_bus_mV = 0;
+  int64_t sum_v_cap_mV = 0;
+  int64_t sum_i_load_mA = 0;
+  int64_t sum_i_out_mA = 0;
+  int64_t sum_i_conv_mA = 0;
+  int64_t sum_wm_v_mV = 0;
+  int64_t sum_wm_i_mA = 0;
+
+  for (uint32_t i = 0; i < STATUS_AVG_SAMPLES; i++)
+  {
+    const float v_bus = g_latest.v_bus;
+    const float v_cap = g_latest.v_cap;
+    const float i_load = g_latest.i_load;
+    const float i_out = g_latest.i_out;
+    const float i_conv = g_latest.i_conv;
+    const float wm_v = meter_v;
+    const float wm_i = meter_i;
+
+    sum_v_bus_mV += (int32_t)(v_bus * 1000.0f);
+    sum_v_cap_mV += (int32_t)(v_cap * 1000.0f);
+    sum_i_load_mA += (int32_t)(i_load * 1000.0f);
+    sum_i_out_mA += (int32_t)(i_out * 1000.0f);
+    sum_i_conv_mA += (int32_t)(i_conv * 1000.0f);
+    sum_wm_v_mV += (int32_t)(wm_v * 1000.0f);
+    sum_wm_i_mA += (int32_t)(wm_i * 1000.0f);
+
+    osDelay(STATUS_AVG_DELAY_MS);
+  }
+
+  const int32_t v_bus_avg_mV = (int32_t)((sum_v_bus_mV + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
+  const int32_t v_cap_avg_mV = (int32_t)((sum_v_cap_mV + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
+  const int32_t i_load_avg_mA = (int32_t)((sum_i_load_mA + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
+  const int32_t i_out_avg_mA = (int32_t)((sum_i_out_mA + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
+  const int32_t i_conv_avg_mA = (int32_t)((sum_i_conv_mA + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
+  const int32_t wm_v_avg_mV = (int32_t)((sum_wm_v_mV + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
+  const int32_t wm_i_avg_mA = (int32_t)((sum_wm_i_mA + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
+
+  const uint32_t telemetry_seq = g_telemetry_seq;
+  const uint32_t adc_seq_hz = g_adc_seq_hz;
+
+  const unsigned swen = (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_SWEN_Pin) != GPIO_PIN_RESET) ? 1u : 0u);
+  const unsigned mode_msb = (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_MODEMSB_Pin) != GPIO_PIN_RESET) ? 1u : 0u);
+  const unsigned mode_lsb = (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_MODELSB_Pin) != GPIO_PIN_RESET) ? 1u : 0u);
+  const unsigned dir = (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_DIR_Pin) != GPIO_PIN_RESET) ? 1u : 0u);
+  const unsigned mode_u2 = (unsigned)((mode_msb << 1) | mode_lsb);
+
   const uint32_t dac1_1_u12 = (uint32_t)(HAL_DAC_GetValue(&hdac1, DAC_CHANNEL_1) & 0x0FFFu);
   const uint32_t dac1_2_u12 = (uint32_t)(HAL_DAC_GetValue(&hdac1, DAC_CHANNEL_2) & 0x0FFFu);
   const uint32_t dac3_1_u12 = (uint32_t)(HAL_DAC_GetValue(&hdac3, DAC_CHANNEL_1) & 0x0FFFu);
@@ -311,36 +363,61 @@ static void usbcli_cmd_status(void)
     break;
   }
 
-  usbcli_printf("telemetry=%s ctrl=%s swen=%u mode=%u%u dir=%u dac1_1_u12=%lu dac1_1_mV=%lu dac1_2_u12=%lu dac1_2_mV=%lu dac3_1_u12=%lu dac3_1_mV=%lu\r\n",
-                g_telemetry_enabled ? "on" : "off",
-                src,
-                (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_SWEN_Pin) != GPIO_PIN_RESET) ? 1u : 0u),
-                (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_MODEMSB_Pin) != GPIO_PIN_RESET) ? 1u : 0u),
-                (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_MODELSB_Pin) != GPIO_PIN_RESET) ? 1u : 0u),
-                (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_DIR_Pin) != GPIO_PIN_RESET) ? 1u : 0u),
-                (unsigned long)dac1_1_u12,
-                (unsigned long)dac1_1_mV,
-                (unsigned long)dac1_2_u12,
-                (unsigned long)dac1_2_mV,
-                (unsigned long)dac3_1_u12,
-                (unsigned long)dac3_1_mV);
+  usbcli_printf("Control:\r\n");
+  usbcli_printf("  Telemetry streaming enabled: %s\r\n", g_telemetry_enabled ? "yes" : "no");
+  usbcli_printf("  Control mode: %s\r\n", src);
+  usbcli_printf("  Switch enable output (SWEN) pin: %u\r\n", swen);
+  usbcli_printf("  Mode selection pins (MODE[1:0]): %u%u (decoded=%u)\r\n", mode_msb, mode_lsb, mode_u2);
+  usbcli_printf("  Direction pin (DIR): %u\r\n", dir);
+  usbcli_printf("  Safety flag (is_safe): %u\r\n", g_is_safe ? 1u : 0u);
 
-  const int32_t v_bus_mV = (int32_t)(g_latest.v_bus * 1000.0f);
-  const int32_t v_cap_mV = (int32_t)(g_latest.v_cap * 1000.0f);
-  const int32_t i_load_mA = (int32_t)(g_latest.i_load * 1000.0f);
-  const int32_t i_out_mA = (int32_t)(g_latest.i_out * 1000.0f);
-  const int32_t i_conv_mA = (int32_t)(g_latest.i_conv * 1000.0f);
+  usbcli_printf("Digital-to-analog converter outputs:\r\n");
+  usbcli_printf("  DAC1 channel 1 raw: %lu / 4095\r\n", (unsigned long)dac1_1_u12);
+  usbcli_printf("  DAC1 channel 1 voltage: %lu.%03lu V\r\n",
+                (unsigned long)(dac1_1_mV / 1000u),
+                (unsigned long)(dac1_1_mV % 1000u));
+  usbcli_printf("  DAC1 channel 2 raw: %lu / 4095\r\n", (unsigned long)dac1_2_u12);
+  usbcli_printf("  DAC1 channel 2 voltage: %lu.%03lu V\r\n",
+                (unsigned long)(dac1_2_mV / 1000u),
+                (unsigned long)(dac1_2_mV % 1000u));
+  usbcli_printf("  DAC3 channel 1 raw: %lu / 4095\r\n", (unsigned long)dac3_1_u12);
+  usbcli_printf("  DAC3 channel 1 voltage: %lu.%03lu V\r\n",
+                (unsigned long)(dac3_1_mV / 1000u),
+                (unsigned long)(dac3_1_mV % 1000u));
 
-  usbcli_printf("v_bus_mV=%ld v_cap_mV=%ld i_load_mA=%ld i_out_mA=%ld i_conv_mA=%ld\r\n",
-                (long)v_bus_mV,
-                (long)v_cap_mV,
-                (long)i_load_mA,
-                (long)i_out_mA,
-                (long)i_conv_mA);
+  usbcli_printf("Measured and computed values:\r\n");
+  usbcli_printf("  Averaging window: %lu samples, %lu ms delay\r\n",
+                (unsigned long)STATUS_AVG_SAMPLES,
+                (unsigned long)STATUS_AVG_DELAY_MS);
+  usbcli_printf("  Bus voltage (average): %ld mV\r\n", (long)v_bus_avg_mV);
+  usbcli_printf("  Capacitor voltage (average): %ld mV\r\n", (long)v_cap_avg_mV);
+  usbcli_printf("  Load current (average): %ld mA\r\n", (long)i_load_avg_mA);
+  usbcli_printf("  Output current (average): %ld mA\r\n", (long)i_out_avg_mA);
+  usbcli_printf("  Converter current command (I_conv) (average): %ld mA\r\n", (long)i_conv_avg_mA);
 
   const float p_set = g_latest.p_set;
   const int32_t p_set_w = (int32_t)(p_set + ((p_set >= 0.0f) ? 0.5f : -0.5f));
-  usbcli_printf("p_set_W=%ld\r\n", (long)p_set_w);
+  usbcli_printf("  Power setpoint: %ld W\r\n", (long)p_set_w);
+
+  usbcli_printf("Telemetry and link status:\r\n");
+  usbcli_printf("  USB telemetry sequence number: %lu\r\n", (unsigned long)telemetry_seq);
+  usbcli_printf("  ADC trigger frequency estimate: %lu Hz\r\n", (unsigned long)adc_seq_hz);
+  usbcli_printf("  UART receive count: %lu\r\n", (unsigned long)g_uart_rx.uart_rx_count);
+  usbcli_printf("  CAN receive count: %lu\r\n", (unsigned long)g_can_rx.can_rx_count);
+  usbcli_printf("  UART link up: %u\r\n", g_uart_connected ? 1u : 0u);
+  usbcli_printf("  CAN link up: %u\r\n", g_can_connected ? 1u : 0u);
+
+  const int32_t chassis_power_limit_w = (int32_t)(g_uart_rx.chassis_power_limit_w + 0.5f);
+  const int32_t buf_mj = (int32_t)(g_uart_rx.buf_e_j * 1000.0f);
+  usbcli_printf("  Chassis power limit (UART): %ld W\r\n", (long)chassis_power_limit_w);
+  usbcli_printf("  Buffer energy (UART): %ld mJ\r\n", (long)buf_mj);
+
+  usbcli_printf("  Wattmeter voltage (average): %ld mV\r\n", (long)wm_v_avg_mV);
+  usbcli_printf("  Wattmeter current (average): %ld mA\r\n", (long)wm_i_avg_mA);
+
+  usbcli_printf("DMA interrupt timing:\r\n");
+  usbcli_printf("  DMA1 channel 1 ISR cycles (last): %lu\r\n", (unsigned long)g_dma1_ch1_irq_cycles_last);
+  usbcli_printf("  DMA1 channel 1 ISR cycles (max): %lu\r\n", (unsigned long)g_dma1_ch1_irq_cycles_max);
 }
 
 static void usbcli_cmd_telemetry(int argc, char **argv)
