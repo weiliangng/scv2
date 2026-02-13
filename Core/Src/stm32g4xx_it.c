@@ -72,6 +72,11 @@ static inline uint16_t clamp_u12(int32_t v)
   return (uint16_t)v;
 }
 
+static inline bool ScapSafety_IsSafe(float v_bus, float v_cap)
+{
+  return (v_bus > 10.0f) && (v_bus < 30.0f) && (v_cap < 30.0f);
+}
+
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -233,18 +238,30 @@ void DMA1_Channel1_IRQHandler(void)
 
     // ADC1 (see `shared_state.h`): [0]=Vcap, [1]=Vbus
     const uint16_t n_adc_vbus = g_adc1_dma_buf[1] & 0x0FFFU;
+    const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
 
     // ADC2 (see `shared_state.h`): [0]=ILOAD differential (offset-binary)
     const uint16_t n_adc_iload = g_adc2_dma_buf[0] & 0x0FFFU;
 
     const float v_bus = (A_VBUS * (float)n_adc_vbus) + B_VBUS;
+    const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
     const float i_load = (A_ILOAD * (float)n_adc_iload) + B_ILOAD;
+
+    g_is_safe = ScapSafety_IsSafe(v_bus, v_cap);
 
     const float p_set = g_latest.p_set;
     float denom = (float)n_adc_vbus + N_OFFSET;
     if (denom < 1.0f) { denom = 1.0f; }
     const float inv_v_bus = A_VBUS_INV / denom;
-    const float i_conv = (p_set * inv_v_bus) - i_load;
+    float i_conv = (p_set * inv_v_bus) - i_load;
+    if (i_conv > I_CONV_CLAMP_ABS_A)
+    {
+      i_conv = I_CONV_CLAMP_ABS_A;
+    }
+    else if (i_conv < -I_CONV_CLAMP_ABS_A)
+    {
+      i_conv = -I_CONV_CLAMP_ABS_A;
+    }
 
 
 
@@ -252,18 +269,14 @@ void DMA1_Channel1_IRQHandler(void)
     const uint16_t n_dac_n = clamp_u12((int32_t)(A_INN + (i_conv * B_INN)));
 
     g_latest.v_bus = v_bus;
+    g_latest.v_cap = v_cap;
     g_latest.i_load = i_load;
     g_latest.i_conv = i_conv;
 
     const ctrl_src_t ctrl_src = g_ctrl_src;
-    if ((ctrl_src == SRC_ALGO) || (ctrl_src == SRC_CAN))
-    {
-      LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_p, n_dac_n);
-    }
-
-    // Only let ISR drive DIR when in ALGO ownership.
     if (ctrl_src == SRC_ALGO)
     {
+      LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_p, n_dac_n);
       // Fast: one write to BSRR (set or reset PB1) based on i_conv sign.
       // (BS1 sets PB1; BR1 resets PB1).
       GPIOB->BSRR = (i_conv > 0.0f) ? GPIO_BSRR_BS1 : GPIO_BSRR_BR1;
@@ -421,15 +434,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
       const uint8_t settings = d[0];
 
       g_can_rx.settings_raw = settings;
-      g_can_rx.en = (settings & (1u << 0)) != 0u;//enable or disable swen
-      g_can_rx.mode = (settings & (1u << 1)) != 0u;//control policy (0=UART auto, 1=CAN manual)
-      g_can_rx.dir = (settings & (1u << 2)) != 0u;//only active in CAN manual mode, forces DIR in HCM
+      g_can_rx.en = (settings & (1u << 0)) != 0u;//bit0: enable or disable SWEN (other bits reserved)
 
       g_can_rx.last_cmd_tick = g_can_rx.last_can_tick;
-      g_can_rx.can_power = (uint16_t)d[1] | ((uint16_t)d[2] << 8);//alternate source of power limit if UART breaks down/override UART if CAN manual
+      g_can_rx.can_power = (uint16_t)d[1] | ((uint16_t)d[2] << 8);//alternate source of power limit if UART breaks down
       g_can_rx.can_buf = d[3];//alternate source of current buffer energy if UART breaks down
 
-      ScapIo_CanRxUpdateIsr(g_can_rx.en, g_can_rx.dir, g_can_rx.mode);
       continue;
     }
   }

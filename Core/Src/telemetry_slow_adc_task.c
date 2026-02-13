@@ -111,11 +111,7 @@ static void update_p_set_1khz(void)
     const bool can_cmd_connected = (g_can_rx.can_rx_count != 0u) &&
                                    ((uint32_t)(now_ms - last_cmd_ms) <= CAN_CMD_TIMEOUT_MS);
 
-    if (g_can_rx.mode && can_cmd_connected)
-    {
-      p_set_w = (float)g_can_rx.can_power;
-    }
-    else if (g_uart_connected)
+    if (g_uart_connected)
     {
       p_set_w = g_uart_rx.chassis_power_limit_w;
     }
@@ -174,18 +170,16 @@ void TelemetrySlowAdcTask_Run(void const *argument)
     update_rx_connection_status_1khz();
     update_p_set_1khz();
 
-    const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
     const uint16_t n_adc_imonop = g_adc2_dma_buf[1] & 0x0FFFU;
     const uint16_t n_adc_imonon = g_adc2_dma_buf[2] & 0x0FFFU;
 
-    const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
+    const float v_cap = g_latest.v_cap;
 
     const float i_out_p = (A_OP * (float)n_adc_imonop) + B_OP;
     const float i_out_n = (A_ON * (float)n_adc_imonon) + B_ON;
 
     const float i_out = (i_out_p > -i_out_n) ? i_out_p : i_out_n;
 
-    g_latest.v_cap = v_cap;
     g_latest.i_out_p = i_out_p;
     g_latest.i_out_n = i_out_n;
     g_latest.i_out = i_out;

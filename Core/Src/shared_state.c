@@ -15,6 +15,7 @@ const float V_cap_max = 26.3f;
 volatile uint32_t g_dma1_ch1_irq_cycles_last;
 volatile uint32_t g_dma1_ch1_irq_cycles_max;
 volatile uint32_t g_adc_seq_count;
+volatile bool g_is_safe;
 
 /* See `Core/Inc/shared_state.h` for buffer index meanings. */
 volatile uint16_t g_adc1_dma_buf[2];
@@ -26,5 +27,5 @@ volatile uart_rx_state_t g_uart_rx;
 volatile bool g_can_connected;
 volatile bool g_uart_connected;
 
-volatile ctrl_src_t g_ctrl_src = SRC_MANUAL;
+volatile ctrl_src_t g_ctrl_src = SRC_ALGO;
 volatile bool g_telemetry_enabled = true;

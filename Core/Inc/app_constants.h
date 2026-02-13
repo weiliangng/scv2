@@ -26,6 +26,9 @@ extern float MIDPOINT;   // count
 extern float A_VBUS_INV;
 extern float N_OFFSET;
 
+// Clamp applied to I_conv in the fast DMA ISR (absolute value, Amps).
+#define I_CONV_CLAMP_ABS_A (10.0f)
+
 // DAC setting (real units -> counts)
 // N_dac_p = A_INP + I_conv * B_INP
 extern float A_INP;      // counts

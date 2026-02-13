@@ -54,6 +54,12 @@ extern volatile uint32_t g_dma1_ch1_irq_cycles_max;
 extern volatile uint32_t g_adc_seq_count;
 
 /*
+ * Fast safety flag computed in the DMA ISR.
+ * True when the measured voltages are within safe limits.
+ */
+extern volatile bool g_is_safe;
+
+/*
  * ADC DMA buffers updated by hardware/DMA and consumed in ISR/task contexts.
  */
 /*
@@ -81,11 +87,9 @@ typedef struct
   uint32_t last_can_tick;
   uint32_t last_cmd_tick;
   uint32_t can_rx_count;
-  uint8_t settings_raw;
+  uint8_t settings_raw; // raw settings byte; currently only bit0 (SWEN request) is used
   uint16_t can_power;//alternate power limit source from CAN
   uint8_t can_buf;//alternate buffer energy source from CAN
-  bool mode;//control policy: 0=UART auto w/ CAN fallback, 1=CAN manual control
-  bool dir;//only active in CAN manual mode (forces DIR in HCM)
   bool en;//enable switching
 } can_rx_state_t;
 
@@ -94,8 +98,7 @@ extern volatile can_rx_state_t g_can_rx;
 typedef enum
 {
   SRC_MANUAL = 0, // cli request
-  SRC_CAN = 1,    // can request
-  SRC_ALGO = 2,   // default on startup
+  SRC_ALGO = 1,   // default on startup
 } ctrl_src_t;
 
 extern volatile ctrl_src_t g_ctrl_src;

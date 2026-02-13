@@ -275,7 +275,7 @@ static void usbcli_cmd_help(void)
       "  help\r\n"
       "  status\r\n"
       "  telemetry on|off|toggle\r\n"
-      "  ctrl <algo|can|manual>\r\n"
+      "  ctrl <auto|manual>\r\n"
       "  pset <0..240>\r\n"
       "  swen <0|1>\r\n"
       "  mode <ccm|hcm|dcm|burst>\r\n"
@@ -297,12 +297,9 @@ static void usbcli_cmd_status(void)
   case SRC_MANUAL:
     src = "manual";
     break;
-  case SRC_CAN:
-    src = "can";
-    break;
   case SRC_ALGO:
   default:
-    src = "algo";
+    src = "auto";
     break;
   }
 
@@ -416,17 +413,13 @@ static void usbcli_cmd_ctrl(int argc, char **argv)
 {
   if (argc < 2)
   {
-    usbcli_printf("usage: ctrl <algo|can|manual>\r\n");
+    usbcli_printf("usage: ctrl <auto|manual>\r\n");
     return;
   }
 
-  if (usbcli_streq(argv[1], "algo"))
+  if (usbcli_streq(argv[1], "auto") || usbcli_streq(argv[1], "algo"))
   {
     g_ctrl_src = SRC_ALGO;
-  }
-  else if (usbcli_streq(argv[1], "can"))
-  {
-    g_ctrl_src = SRC_CAN;
   }
   else if (usbcli_streq(argv[1], "manual"))
   {
@@ -434,7 +427,7 @@ static void usbcli_cmd_ctrl(int argc, char **argv)
   }
   else
   {
-    usbcli_printf("usage: ctrl <algo|can|manual>\r\n");
+    usbcli_printf("usage: ctrl <auto|manual>\r\n");
     return;
   }
 
@@ -595,7 +588,7 @@ static void usbcli_cmd_dac(int argc, char **argv)
 
   if ((dac_n == 1U) && (g_ctrl_src != SRC_MANUAL))
   {
-    usbcli_printf("err: DAC1 updated in ISR (src=algo/can); run 'ctrl manual' first\r\n");
+    usbcli_printf("err: DAC1 updated in ISR (src=auto); run 'ctrl manual' first\r\n");
     return;
   }
 

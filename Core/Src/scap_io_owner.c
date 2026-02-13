@@ -47,7 +47,6 @@ static inline void gpio_write_masked_bsrr(GPIO_TypeDef *port, uint16_t affect_ma
 }
 
 static volatile uint16_t g_pb_manual;
-static volatile uint16_t g_pb_can;
 static volatile uint16_t g_pb_algo;
 
 static volatile uint8_t g_fault_latched;
@@ -61,7 +60,6 @@ static uint16_t g_last_ext_md_dir;
 void ScapIo_Init(void)
 {
   g_pb_manual = pb_pack(UNIDIRECTIONAL, true, false);
-  g_pb_can = pb_pack(UNIDIRECTIONAL, true, false);
   g_pb_algo = pb_pack(UNIDIRECTIONAL, true, false);
 
   g_fault_latched = 0u;
@@ -137,24 +135,6 @@ void ScapIo_ManualSetSwen(bool swen_high)
   g_ctrl_src = SRC_MANUAL;
 }
 
-void ScapIo_CanRxUpdateIsr(bool swen_high, bool dir_high, bool can_manual)
-{
-  const scap_mode_t mode = can_manual ? UNIDIRECTIONAL : BIDIRECTIONAL;
-  g_pb_can = pb_pack(mode, dir_high, swen_high);
-
-  /*
-   * CAN policy bit selects controller ownership:
-   * - 0: UART auto w/ CAN fallback (stay in ALGO)
-   * - 1: CAN manual control (CAN owns IO/DIR)
-   *
-   * Manual always has priority and cannot be preempted by CAN.
-   */
-  if (g_ctrl_src != SRC_MANUAL)
-  {
-    g_ctrl_src = can_manual ? SRC_CAN : SRC_ALGO;
-  }
-}
-
 void ScapIo_Tick1kHz(void)
 {
   uint16_t pb = 0u;
@@ -168,22 +148,10 @@ void ScapIo_Tick1kHz(void)
     can_cmd_connected = ((uint32_t)(now_ms - last_cmd_ms) <= CAN_CMD_TIMEOUT_MS);
   }
 
-  if (src == SRC_CAN)
-  {
-    if ((!can_cmd_connected) || (g_can_rx.mode == false))
-    {
-      g_ctrl_src = SRC_ALGO;
-      src = SRC_ALGO;
-    }
-  }
-
   switch (src)
   {
   case SRC_MANUAL:
     pb = g_pb_manual;
-    break;
-  case SRC_CAN:
-    pb = g_pb_can;
     break;
   case SRC_ALGO:
   default:
@@ -191,7 +159,7 @@ void ScapIo_Tick1kHz(void)
     break;
   }
 
-  if ((src == SRC_MANUAL) || (src == SRC_CAN))
+  if (src == SRC_MANUAL)
   {
     const uint16_t md_dir = (uint16_t)(pb & PB_MD_DIR_MASK);
     if (md_dir != g_last_ext_md_dir)
