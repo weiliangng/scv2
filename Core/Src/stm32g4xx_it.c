@@ -283,7 +283,7 @@ void DMA1_Channel1_IRQHandler(void)
         GPIOB->BSRR = GPIO_BSRR_BR1;
         n_dac_p = n_dac_n;
       }
-      LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);//flipped
+      LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);
     }
   }
   else
@@ -389,6 +389,20 @@ void USART3_IRQHandler(void)
   /* USER CODE BEGIN USART3_IRQn 1 */
 
   /* USER CODE END USART3_IRQn 1 */
+}
+
+/**
+  * @brief This function handles EXTI line[15:10] interrupts.
+  */
+void EXTI15_10_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI15_10_IRQn 0 */
+
+  /* USER CODE END EXTI15_10_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
+  /* USER CODE BEGIN EXTI15_10_IRQn 1 */
+
+  /* USER CODE END EXTI15_10_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
