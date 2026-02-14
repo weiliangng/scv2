@@ -276,7 +276,7 @@ void DMA1_Channel1_IRQHandler(void)
   if (LL_DMA_IsActiveFlag_TC1(DMA1) != 0U)
   {
     LL_DMA_ClearFlag_GI1(DMA1);
-    //g_adc_seq_count++;
+    g_adc_seq_count++;
 
     //LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_4);
 
