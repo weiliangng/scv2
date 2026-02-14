@@ -38,6 +38,8 @@ extern volatile float g_manual_p_set_w;
  */
 extern const float C_cap;
 extern const float V_cap_max;
+extern const float cap_hi;
+extern const float cap_lo;
 
 /*
  * ISR timing metrics (DWT CYCCNT cycles).

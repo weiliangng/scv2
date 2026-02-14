@@ -276,7 +276,7 @@ void DMA1_Channel1_IRQHandler(void)
   if (LL_DMA_IsActiveFlag_TC1(DMA1) != 0U)
   {
     LL_DMA_ClearFlag_GI1(DMA1);
-    g_adc_seq_count++;
+    //g_adc_seq_count++;
 
     //LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_4);
 
@@ -326,6 +326,13 @@ void DMA1_Channel1_IRQHandler(void)
     }
 
     uint8_t swen_auto = g_swen_auto_req;
+
+    if (swen_auto != 0u)
+    {
+      swen_auto = (uint8_t)(
+          ((v_cap < V_cap_max) && (curr_buf > 55.0f) && (i_conv > 0.0f)) ||
+          ((v_cap > cap_lo) && (curr_buf < 20.0f) && (i_conv < 0.0f)));
+    }
 
     uint8_t desired = 0u;
     if ((ScapSafety_IsSafe(v_bus, v_cap)) && (g_swen_force_low_slow == 0u))

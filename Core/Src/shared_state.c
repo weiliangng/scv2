@@ -11,6 +11,8 @@ volatile float meter_i = 0.0f;
 
 const float C_cap = 1822.5f;
 const float V_cap_max = 26.3f;
+const float cap_hi = 0.97f * V_cap_max;
+const float cap_lo = 0.20f * V_cap_max;
 
 volatile uint32_t g_dma1_ch1_irq_cycles_last;
 volatile uint32_t g_dma1_ch1_irq_cycles_max;
@@ -32,5 +34,5 @@ volatile bool g_can_cmd_connected;
 
 volatile float g_curr_buf_e_j = 0.0f;
 
-volatile ctrl_src_t g_ctrl_src = SRC_MANUAL;
+volatile ctrl_src_t g_ctrl_src = SRC_ALGO;
 volatile bool g_telemetry_enabled = true;
