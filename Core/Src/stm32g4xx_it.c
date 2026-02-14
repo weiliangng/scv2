@@ -262,13 +262,16 @@ void DMA1_Channel1_IRQHandler(void)
     else curr_buf = -1.0f;
     g_curr_buf_e_j = curr_buf;
 
+    uint8_t swen_auto = g_swen_auto_req;
+
+
     uint8_t desired = 0u;
 
     if ((ScapSafety_IsSafe(v_bus, v_cap)) && (g_swen_force_low_slow == 0u))
     {
       const ctrl_src_t src = g_ctrl_src;
       desired = (src == SRC_MANUAL) ? (((g_pb_manual & GPIO_SWEN_Pin) != 0u) ? 1u : 0u)
-                                    : ((g_swen_auto_req != 0u) ? 1u : 0u);
+                                    : ((swen_auto != 0u) ? 1u : 0u);
     }
 
     if (desired != g_swen_last_applied)
