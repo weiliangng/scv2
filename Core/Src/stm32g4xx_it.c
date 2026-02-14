@@ -256,6 +256,12 @@ void DMA1_Channel1_IRQHandler(void)
     const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
     const float i_load = (A_ILOAD * (float)n_adc_iload) + B_ILOAD;
 
+    float curr_buf;
+    if (g_uart_connected) curr_buf = g_uart_rx.buf_e_j;
+    else if (g_can_cmd_connected) curr_buf = (float)g_can_rx.can_buf;
+    else curr_buf = -1.0f;
+    g_curr_buf_e_j = curr_buf;
+
     uint8_t desired = 0u;
 
     if ((ScapSafety_IsSafe(v_bus, v_cap)) && (g_swen_force_low_slow == 0u))

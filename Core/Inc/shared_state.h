@@ -130,11 +130,22 @@ extern volatile uart_rx_state_t g_uart_rx;
  */
 extern volatile bool g_can_connected;
 extern volatile bool g_uart_connected;
+extern volatile bool g_can_cmd_connected;
 
 /*
  * Control source for power-stage IO (SWEN/MODE/DIR).
  * When SRC_ALGO is selected, the fast DMA ISR controls DIR.
  */
+
+/*
+ * Resolved "current buffer energy" (J) for use in control/telemetry:
+ * - When UART link is up, mirrors `g_uart_rx.buf_e_j`.
+ * - Else when CAN command packets are fresh, mirrors `g_can_rx.can_buf` (unit/scaling depends on sender).
+ * - Else 0.
+ *
+ * Written from the fast DMA ISR; read from task/CLI contexts.
+ */
+extern volatile float g_curr_buf_e_j;
 
 /*
  * Telemetry stream enable:

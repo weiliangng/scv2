@@ -1232,7 +1232,7 @@ void StartTelemetryTask(void const * argument)
     const float i_out = g_latest.i_out;
     const float i_conv = g_latest.i_conv;
     const float chassis_power_limit_w = g_uart_rx.chassis_power_limit_w;
-    const float buf_e_j = g_uart_rx.buf_e_j;
+    const float buf_e_j = g_curr_buf_e_j;
     const uint32_t uart_rx_count = g_uart_rx.uart_rx_count;
     const uint32_t can_rx_count = g_can_rx.can_rx_count;
     const uint32_t can_up = g_can_connected ? 1u : 0u;

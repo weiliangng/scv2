@@ -409,8 +409,10 @@ static void usbcli_cmd_status(void)
 
   const int32_t chassis_power_limit_w = (int32_t)(g_uart_rx.chassis_power_limit_w + 0.5f);
   const int32_t buf_mj = (int32_t)(g_uart_rx.buf_e_j * 1000.0f);
+  const int32_t curr_buf_mj = (int32_t)(g_curr_buf_e_j * 1000.0f);
   usbcli_printf("  Chassis power limit (UART): %ld W\r\n", (long)chassis_power_limit_w);
   usbcli_printf("  Buffer energy (UART): %ld mJ\r\n", (long)buf_mj);
+  usbcli_printf("  Buffer energy (resolved): %ld mJ\r\n", (long)curr_buf_mj);
 
   usbcli_printf("  Wattmeter voltage (average): %ld mV\r\n", (long)wm_v_avg_mV);
   usbcli_printf("  Wattmeter current (average): %ld mA\r\n", (long)wm_i_avg_mA);

@@ -84,6 +84,14 @@ static void update_rx_connection_status_1khz(void)
   }
   g_can_connected = can_connected;
 
+  bool can_cmd_connected = false;
+  if (g_can_rx.can_rx_count != 0u)
+  {
+    const uint32_t last_cmd_ms = g_can_rx.last_cmd_tick;
+    can_cmd_connected = ((uint32_t)(now_ms - last_cmd_ms) <= CAN_CMD_TIMEOUT_MS);
+  }
+  g_can_cmd_connected = can_cmd_connected;
+
   bool uart_connected = false;
   if (g_uart_rx.uart_rx_count != 0u)
   {
@@ -105,17 +113,11 @@ static void update_p_set_1khz(void)
   }
   else
   {
-    const uint32_t now_ms = HAL_GetTick();
-
-    const uint32_t last_cmd_ms = g_can_rx.last_cmd_tick;
-    const bool can_cmd_connected = (g_can_rx.can_rx_count != 0u) &&
-                                   ((uint32_t)(now_ms - last_cmd_ms) <= CAN_CMD_TIMEOUT_MS);
-
     if (g_uart_connected)
     {
       p_set_w = g_uart_rx.chassis_power_limit_w;
     }
-    else if (can_cmd_connected)
+    else if (g_can_cmd_connected)
     {
       p_set_w = (float)g_can_rx.can_power;
     }
