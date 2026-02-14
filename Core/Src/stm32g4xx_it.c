@@ -298,7 +298,7 @@ void DMA1_Channel1_IRQHandler(void)
     }
 
     uint8_t swen_auto = g_swen_auto_req;
-    
+
     uint8_t desired = 0u;
 
     if ((ScapSafety_IsSafe(v_bus, v_cap)) && (g_swen_force_low_slow == 0u))
