@@ -46,7 +46,7 @@ static inline void gpio_write_masked_bsrr(GPIO_TypeDef *port, uint16_t affect_ma
   port->BSRR = ((uint32_t)reset_mask << 16) | (uint32_t)set_mask;
 }
 
-static volatile uint16_t g_pb_manual;
+volatile uint16_t g_pb_manual;
 static volatile uint16_t g_pb_algo;
 
 static volatile uint8_t g_fault_latched;
@@ -54,6 +54,13 @@ static volatile uint16_t g_swen_pulse_req_ms;
 
 static uint16_t g_boot_settle_ms;
 static uint16_t g_swen_pulse_ms;
+
+/* SWEN request for auto (SRC_ALGO) mode; updated by CAN ISR and/or button ISR. */
+volatile uint8_t g_swen_auto_req;
+
+/* Slow-task computed SWEN force-low flag (boot settle / pulse / fault latch). */
+volatile uint8_t g_swen_force_low_slow;
+
 static volatile uint16_t g_last_applied_pb;
 static uint16_t g_last_ext_md_dir;
 
@@ -67,6 +74,8 @@ void ScapIo_Init(void)
 
   g_boot_settle_ms = SCAP_IO_BOOT_SETTLE_MS;
   g_swen_pulse_ms = 0u;
+  g_swen_auto_req = 0u;
+  g_swen_force_low_slow = 1u;
   g_last_applied_pb = 0xFFFFu;
   g_last_ext_md_dir = 0xFFFFu;
 }
@@ -90,6 +99,8 @@ void ScapIo_RequestSwenPulseMs(uint16_t pulse_ms)
 
 void ScapIo_ManualSetMode(scap_mode_t mode)
 {
+  const uint32_t primask = __get_PRIMASK();
+  __disable_irq();
   uint16_t v = g_pb_manual;
   v &= (uint16_t)~PB_MODE_MASK;
 
@@ -102,11 +113,17 @@ void ScapIo_ManualSetMode(scap_mode_t mode)
     v |= PB_MODE_LSB;
   }
   g_pb_manual = v;
+  if (primask == 0u)
+  {
+    __enable_irq();
+  }
   g_ctrl_src = SRC_MANUAL;
 }
 
 void ScapIo_ManualSetDir(bool dir_high)
 {
+  const uint32_t primask = __get_PRIMASK();
+  __disable_irq();
   uint16_t v = g_pb_manual;
   if (dir_high)
   {
@@ -117,11 +134,17 @@ void ScapIo_ManualSetDir(bool dir_high)
     v &= (uint16_t)~PB_DIR;
   }
   g_pb_manual = v;
+  if (primask == 0u)
+  {
+    __enable_irq();
+  }
   g_ctrl_src = SRC_MANUAL;
 }
 
 void ScapIo_ManualSetSwen(bool swen_high)
 {
+  const uint32_t primask = __get_PRIMASK();
+  __disable_irq();
   uint16_t v = g_pb_manual;
   if (swen_high)
   {
@@ -132,21 +155,34 @@ void ScapIo_ManualSetSwen(bool swen_high)
     v &= (uint16_t)~PB_SWEN;
   }
   g_pb_manual = v;
+  if (primask == 0u)
+  {
+    __enable_irq();
+  }
   g_ctrl_src = SRC_MANUAL;
+}
+
+void ScapIo_AutoSetSwenFromCanIsr(bool swen_high)
+{
+  g_swen_auto_req = swen_high ? 1u : 0u;
+}
+
+void ScapIo_ButtonToggleSwenIsr(void)
+{
+  const ctrl_src_t src = g_ctrl_src;
+  if (src == SRC_MANUAL)
+  {
+    g_pb_manual ^= PB_SWEN;
+    return;
+  }
+
+  g_swen_auto_req = (g_swen_auto_req == 0u) ? 1u : 0u;
 }
 
 void ScapIo_Tick1kHz(void)
 {
   uint16_t pb = 0u;
   ctrl_src_t src = g_ctrl_src;
-  const uint32_t now_ms = HAL_GetTick();
-  bool can_cmd_connected = false;
-
-  if (g_can_rx.can_rx_count != 0u)
-  {
-    const uint32_t last_cmd_ms = g_can_rx.last_cmd_tick;
-    can_cmd_connected = ((uint32_t)(now_ms - last_cmd_ms) <= CAN_CMD_TIMEOUT_MS);
-  }
 
   switch (src)
   {
@@ -169,18 +205,6 @@ void ScapIo_Tick1kHz(void)
     }
   }
 
-  if ((src != SRC_MANUAL) && can_cmd_connected)
-  {
-    if (g_can_rx.en)
-    {
-      pb |= PB_SWEN;
-    }
-    else
-    {
-      pb &= (uint16_t)~PB_SWEN;
-    }
-  }
-
   const uint16_t req = g_swen_pulse_req_ms;
   if (req != 0u)
   {
@@ -200,12 +224,9 @@ void ScapIo_Tick1kHz(void)
     g_swen_pulse_ms--;
   }
 
-  if ((g_fault_latched != 0u) || (g_boot_settle_ms != 0u) || (g_swen_pulse_ms != 0u))
-  {
-    pb &= (uint16_t)~PB_SWEN;
-  }
+  g_swen_force_low_slow = ((g_fault_latched != 0u) || (g_boot_settle_ms != 0u) || (g_swen_pulse_ms != 0u)) ? 1u : 0u;
 
-  uint16_t affect = (uint16_t)(PB_SWEN | PB_MODE_MASK);
+  uint16_t affect = (uint16_t)(PB_MODE_MASK);
   if (src != SRC_ALGO)
   {
     affect |= PB_DIR;

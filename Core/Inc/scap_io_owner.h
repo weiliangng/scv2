@@ -30,3 +30,11 @@ void ScapIo_RequestSwenPulseMs(uint16_t pulse_ms);
 void ScapIo_ManualSetMode(scap_mode_t mode);
 void ScapIo_ManualSetDir(bool dir_high);
 void ScapIo_ManualSetSwen(bool swen_high);
+
+/* ISR-facing SWEN plumbing (SWEN is applied from ISR context). */
+extern volatile uint16_t g_pb_manual;
+extern volatile uint8_t g_swen_auto_req;
+extern volatile uint8_t g_swen_force_low_slow;
+
+void ScapIo_AutoSetSwenFromCanIsr(bool swen_high);
+void ScapIo_ButtonToggleSwenIsr(void);

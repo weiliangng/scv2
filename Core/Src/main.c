@@ -33,6 +33,7 @@
 #include "referee_uart.h"
 #include "nvm_eeprom.h"
 #include "stm32g4xx_ll_dac.h"
+#include "scap_io_owner.h"
 
 /* USER CODE END Includes */
 
@@ -188,6 +189,7 @@ int main(void)
   MX_TIM2_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
+  ScapIo_Init();
   CycleCountWatchdog_Init();
   DbgUsb_Init();
   UsbCli_Init();

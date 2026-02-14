@@ -77,6 +77,15 @@ static inline bool ScapSafety_IsSafe(float v_bus, float v_cap)
   return (v_bus > 10.0f) && (v_bus < 30.0f) && (v_cap < 30.0f);
 }
 
+static inline void gpio_write_masked_bsrr(GPIO_TypeDef *port, uint16_t affect_mask, uint16_t desired)
+{
+  const uint16_t set_mask = (uint16_t)(desired & affect_mask);
+  const uint16_t reset_mask = (uint16_t)((~desired) & affect_mask);
+  port->BSRR = ((uint32_t)reset_mask << 16) | (uint32_t)set_mask;
+}
+
+static uint8_t g_swen_last_applied = 0xFFu; /* force first apply */
+
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -247,7 +256,21 @@ void DMA1_Channel1_IRQHandler(void)
     const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
     const float i_load = (A_ILOAD * (float)n_adc_iload) + B_ILOAD;
 
-    g_is_safe = ScapSafety_IsSafe(v_bus, v_cap);
+    uint8_t desired = 0u;
+
+    if ((ScapSafety_IsSafe(v_bus, v_cap)) && (g_swen_force_low_slow == 0u))
+    {
+      const ctrl_src_t src = g_ctrl_src;
+      desired = (src == SRC_MANUAL) ? (((g_pb_manual & GPIO_SWEN_Pin) != 0u) ? 1u : 0u)
+                                    : ((g_swen_auto_req != 0u) ? 1u : 0u);
+    }
+
+    if (desired != g_swen_last_applied)
+    {
+      gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, desired ? GPIO_SWEN_Pin : 0u);
+      gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin, desired ? GPIO_LED_Pin : 0u);
+      g_swen_last_applied = desired;
+    }
 
     const float p_set = g_latest.p_set;
     float denom = (float)n_adc_vbus + N_OFFSET;
@@ -453,6 +476,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
       g_can_rx.settings_raw = settings;
       g_can_rx.en = (settings & (1u << 0)) != 0u;//bit0: enable or disable SWEN (other bits reserved)
+      ScapIo_AutoSetSwenFromCanIsr(g_can_rx.en);
 
       g_can_rx.last_cmd_tick = g_can_rx.last_can_tick;
       g_can_rx.can_power = (uint16_t)d[1] | ((uint16_t)d[2] << 8);//alternate source of power limit if UART breaks down
@@ -461,6 +485,34 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
       continue;
     }
   }
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin != GPIO_PIN_13)
+  {
+    return;
+  }
+
+  /*
+   * Debounce EXTI13 pushbutton: ignore additional edges within a short window.
+   * PC13 is configured as GPIO_MODE_IT_RISING with pulldown in MX_GPIO_Init().
+   */
+  enum
+  {
+    EXTI13_DEBOUNCE_MS = 500u,
+  };
+  static uint32_t s_last_btn_tick_ms;
+  static uint8_t s_has_last_btn_tick;
+  const uint32_t now_ms = HAL_GetTick();
+  if ((s_has_last_btn_tick != 0u) && ((uint32_t)(now_ms - s_last_btn_tick_ms) < (uint32_t)EXTI13_DEBOUNCE_MS))
+  {
+    return;
+  }
+  s_has_last_btn_tick = 1u;
+  s_last_btn_tick_ms = now_ms;
+
+  ScapIo_ButtonToggleSwenIsr();
 }
 
 /* USER CODE END 1 */

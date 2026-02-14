@@ -132,8 +132,6 @@ void TelemetrySlowAdcTask_Run(void const *argument)
 {
   (void)argument;
 
-  ScapIo_Init();
-
   static const uint8_t status_code = 0u;
   FDCAN_TxHeaderTypeDef tx_header = {
       .Identifier = SCAP_STAT_ID,
