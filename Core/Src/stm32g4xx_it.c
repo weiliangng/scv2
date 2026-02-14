@@ -77,6 +77,41 @@ static inline bool ScapSafety_IsSafe(float v_bus, float v_cap)
   return (v_bus > 10.0f) && (v_bus < 30.0f) && (v_cap < 30.0f);
 }
 
+/*
+ * SWEN min-ON/min-OFF limiter using DWT->CYCCNT (wrap-safe).
+ *
+ * NOTE: These timings assume a fixed CPU clock. If you change clocks, update CPU_HZ.
+ */
+#define CPU_HZ (96000000u)
+#define SWEN_MIN_ON_CYC (CPU_HZ / 10u)    /* 100 ms */
+#define SWEN_MIN_OFF_CYC (CPU_HZ / 500u)  /* 2 ms */
+
+static inline uint8_t SwenMinOnOff(uint8_t req_on)
+{
+  const uint32_t now = DWT->CYCCNT;
+  static uint32_t t0;
+  static uint8_t out; /* 0=OFF, 1=ON */
+  const uint32_t dt = now - t0; /* wrap-safe */
+
+  if (out != 0u)
+  {
+    if ((req_on == 0u) && (dt >= (uint32_t)SWEN_MIN_ON_CYC))
+    {
+      out = 0u;
+      t0 = now;
+    }
+  }
+  else
+  {
+    if ((req_on != 0u) && (dt >= (uint32_t)SWEN_MIN_OFF_CYC))
+    {
+      out = 1u;
+      t0 = now;
+    }
+  }
+  return out;
+}
+
 static inline void gpio_write_masked_bsrr(GPIO_TypeDef *port, uint16_t affect_mask, uint16_t desired)
 {
   const uint16_t set_mask = (uint16_t)(desired & affect_mask);
@@ -267,14 +302,8 @@ void DMA1_Channel1_IRQHandler(void)
     if (denom < 1.0f) { denom = 1.0f; }
     const float inv_v_bus = A_VBUS_INV / denom;
     float i_conv = (p_set * inv_v_bus) - i_load;
-    if (i_conv > I_CONV_CLAMP_ABS_A)
-    {
-      i_conv = I_CONV_CLAMP_ABS_A;
-    }
-    else if (i_conv < -I_CONV_CLAMP_ABS_A)
-    {
-      i_conv = -I_CONV_CLAMP_ABS_A;
-    }
+    if (i_conv > I_CONV_CLAMP_ABS_A) i_conv = I_CONV_CLAMP_ABS_A;
+    else if (i_conv < -I_CONV_CLAMP_ABS_A) i_conv = -I_CONV_CLAMP_ABS_A;
 
     uint16_t n_dac_p = clamp_u12((int32_t)(A_INP + (i_conv * B_INP)));
     uint16_t n_dac_n = clamp_u12((int32_t)(A_INN + (i_conv * B_INN)));
@@ -284,8 +313,7 @@ void DMA1_Channel1_IRQHandler(void)
     g_latest.i_load = i_load;
     g_latest.i_conv = i_conv;
 
-    const ctrl_src_t ctrl_src = g_ctrl_src;
-    if (ctrl_src == SRC_ALGO)
+    if (g_ctrl_src == SRC_ALGO)
     {
       if (i_conv > 0.0f) {
         GPIOB->BSRR = GPIO_BSRR_BS1;
@@ -300,7 +328,6 @@ void DMA1_Channel1_IRQHandler(void)
     uint8_t swen_auto = g_swen_auto_req;
 
     uint8_t desired = 0u;
-
     if ((ScapSafety_IsSafe(v_bus, v_cap)) && (g_swen_force_low_slow == 0u))
     {
       const ctrl_src_t src = g_ctrl_src;
