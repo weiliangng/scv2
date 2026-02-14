@@ -335,7 +335,9 @@ void DMA1_Channel1_IRQHandler(void)
     }
 
     uint8_t desired = 0u;
-    if ((ScapSafety_IsSafe(v_bus, v_cap)) && (g_swen_force_low_slow == 0u))
+    const bool is_safe = ScapSafety_IsSafe(v_bus, v_cap);
+    g_is_safe = is_safe;
+    if ((is_safe) && (g_swen_force_low_slow == 0u))
     {
       const ctrl_src_t src = g_ctrl_src;
       desired = (src == SRC_MANUAL) ? (((g_pb_manual & GPIO_SWEN_Pin) != 0u) ? 1u : 0u)
