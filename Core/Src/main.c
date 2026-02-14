@@ -193,6 +193,12 @@ int main(void)
   CycleCountWatchdog_Init();
   DbgUsb_Init();
   UsbCli_Init();
+#if USE_HAL_FDCAN_REGISTER_CALLBACKS == 1
+  if (HAL_FDCAN_RegisterRxFifo0Callback(&hfdcan1, HAL_FDCAN_RxFifo0Callback) != HAL_OK)
+  {
+    Error_Handler();
+  }
+#endif
   if (HAL_FDCAN_ConfigInterruptLines(&hfdcan1, FDCAN_IT_GROUP_RX_FIFO0, FDCAN_INTERRUPT_LINE0) != HAL_OK)
   {
     Error_Handler();
