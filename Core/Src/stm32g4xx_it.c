@@ -262,25 +262,6 @@ void DMA1_Channel1_IRQHandler(void)
     else curr_buf = -1.0f;
     g_curr_buf_e_j = curr_buf;
 
-    uint8_t swen_auto = g_swen_auto_req;
-
-
-    uint8_t desired = 0u;
-
-    if ((ScapSafety_IsSafe(v_bus, v_cap)) && (g_swen_force_low_slow == 0u))
-    {
-      const ctrl_src_t src = g_ctrl_src;
-      desired = (src == SRC_MANUAL) ? (((g_pb_manual & GPIO_SWEN_Pin) != 0u) ? 1u : 0u)
-                                    : ((swen_auto != 0u) ? 1u : 0u);
-    }
-
-    if (desired != g_swen_last_applied)
-    {
-      gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, desired ? GPIO_SWEN_Pin : 0u);
-      gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin, desired ? GPIO_LED_Pin : 0u);
-      g_swen_last_applied = desired;
-    }
-
     const float p_set = g_latest.p_set;
     float denom = (float)n_adc_vbus + N_OFFSET;
     if (denom < 1.0f) { denom = 1.0f; }
@@ -294,8 +275,6 @@ void DMA1_Channel1_IRQHandler(void)
     {
       i_conv = -I_CONV_CLAMP_ABS_A;
     }
-
-
 
     uint16_t n_dac_p = clamp_u12((int32_t)(A_INP + (i_conv * B_INP)));
     uint16_t n_dac_n = clamp_u12((int32_t)(A_INN + (i_conv * B_INN)));
@@ -316,6 +295,24 @@ void DMA1_Channel1_IRQHandler(void)
         n_dac_p = n_dac_n;
       }
       LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);
+    }
+
+    uint8_t swen_auto = g_swen_auto_req;
+    
+    uint8_t desired = 0u;
+
+    if ((ScapSafety_IsSafe(v_bus, v_cap)) && (g_swen_force_low_slow == 0u))
+    {
+      const ctrl_src_t src = g_ctrl_src;
+      desired = (src == SRC_MANUAL) ? (((g_pb_manual & GPIO_SWEN_Pin) != 0u) ? 1u : 0u)
+                                    : ((swen_auto != 0u) ? 1u : 0u);
+    }
+
+    if (desired != g_swen_last_applied)
+    {
+      gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, desired ? GPIO_SWEN_Pin : 0u);
+      gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin, desired ? GPIO_LED_Pin : 0u);
+      g_swen_last_applied = desired;
     }
   }
   else
