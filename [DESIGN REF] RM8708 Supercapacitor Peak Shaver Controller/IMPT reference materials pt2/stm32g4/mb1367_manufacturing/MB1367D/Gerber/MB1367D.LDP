@@ -1,4 +1,0 @@
-Layer Pairs Export File for PCB: C:\Subversion\Board\NUCLEO-G474RE\MB1367-Nucleo64_for_STM32G4_Rockfish_family\Trunk\01-Design_Source\Altium_Designer\MB1367.PcbDoc
-LayersSetName=Top_Bot_Plated_Thru_Holes|DrillFile=mb1367d-roundholes-plated.txt|DrillLayers=gtl,g1,g2,gbl
-LayersSetName=Top_Bot_Plated_Slot_Holes|DrillFile=mb1367d-slotholes-plated.txt|DrillLayers=gtl,g1,g2,gbl
-LayersSetName=Top_Bot_NonPlated_Thru_Holes|DrillFile=mb1367d-roundholes-nonplated.txt|DrillLayers=gtl,g1,g2,gbl

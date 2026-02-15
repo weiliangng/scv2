@@ -1,4 +1,0 @@
-Layer Pairs Export File for PCB: C:\VIRGIL\AAA__JOB\ALTIUM\STM\Projets\MB1367C\Base\MB1367C\02-Design-sources\Altium_Designer\MB1367C.PcbDoc
-LayersSetName=Top_Bot_Plated_Thru_Holes|DrillFile=mb1367c-roundholes-plated.txt|DrillLayers=gtl,g1,g2,gbl
-LayersSetName=Top_Bot_Plated_Slot_Holes|DrillFile=mb1367c-slotholes-plated.txt|DrillLayers=gtl,g1,g2,gbl
-LayersSetName=Top_Bot_NonPlated_Thru_Holes|DrillFile=mb1367c-roundholes-nonplated.txt|DrillLayers=gtl,g1,g2,gbl
