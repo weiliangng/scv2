@@ -35,4 +35,4 @@ volatile bool g_can_cmd_connected;
 volatile float g_curr_buf_e_j = 0.0f;
 
 volatile ctrl_src_t g_ctrl_src = SRC_ALGO;
-volatile bool g_telemetry_enabled = true;
+volatile bool g_telemetry_enabled = false;

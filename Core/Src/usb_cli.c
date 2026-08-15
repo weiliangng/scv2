@@ -304,6 +304,7 @@ static void usbcli_cmd_status(void)
   int64_t sum_i_conv_mA = 0;
   int64_t sum_wm_v_mV = 0;
   int64_t sum_wm_i_mA = 0;
+  DbgUsbStats dbg_stats;
 
   for (uint32_t i = 0; i < STATUS_AVG_SAMPLES; i++)
   {
@@ -336,6 +337,7 @@ static void usbcli_cmd_status(void)
 
   const uint32_t telemetry_seq = g_telemetry_seq;
   const uint32_t adc_seq_hz = g_adc_seq_hz;
+  DbgUsb_GetStats(&dbg_stats);
 
   const unsigned swen = (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_SWEN_Pin) != GPIO_PIN_RESET) ? 1u : 0u);
   const unsigned mode_msb = (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_MODEMSB_Pin) != GPIO_PIN_RESET) ? 1u : 0u);
@@ -413,6 +415,12 @@ static void usbcli_cmd_status(void)
   usbcli_printf("  Chassis power limit (UART): %ld W\r\n", (long)chassis_power_limit_w);
   usbcli_printf("  Buffer energy (UART): %ld mJ\r\n", (long)buf_mj);
   usbcli_printf("  Buffer energy (resolved): %ld mJ\r\n", (long)curr_buf_mj);
+  usbcli_printf("  USB CLI bytes queued: %lu\r\n", (unsigned long)dbg_stats.cli_bytes_queued);
+  usbcli_printf("  USB telemetry records queued/dropped: %lu/%lu\r\n",
+                (unsigned long)dbg_stats.telemetry_records_queued,
+                (unsigned long)dbg_stats.telemetry_records_dropped);
+  usbcli_printf("  USB telemetry bytes queued: %lu\r\n", (unsigned long)dbg_stats.telemetry_bytes_queued);
+  usbcli_printf("  USB disconnects: %lu\r\n", (unsigned long)dbg_stats.usb_disconnect_count);
 
   usbcli_printf("  Wattmeter voltage (average): %ld mV\r\n", (long)wm_v_avg_mV);
   usbcli_printf("  Wattmeter current (average): %ld mA\r\n", (long)wm_i_avg_mA);
