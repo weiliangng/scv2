@@ -55,7 +55,7 @@ static volatile uint16_t g_swen_pulse_req_ms;
 static uint16_t g_boot_settle_ms;
 static uint16_t g_swen_pulse_ms;
 
-/* SWEN request for auto (SRC_ALGO) mode; updated by CAN ISR and/or button ISR. */
+/* SWEN request for auto (SRC_ALGO) mode; updated by the button ISR. */
 volatile uint8_t g_swen_auto_req;
 
 /* Slow-task computed SWEN force-low flag (boot settle / pulse / fault latch). */
@@ -160,11 +160,6 @@ void ScapIo_ManualSetSwen(bool swen_high)
     __enable_irq();
   }
   g_ctrl_src = SRC_MANUAL;
-}
-
-void ScapIo_AutoSetSwenFromCanIsr(bool swen_high)
-{
-  g_swen_auto_req = swen_high ? 1u : 0u;
 }
 
 void ScapIo_ButtonToggleSwenIsr(void)

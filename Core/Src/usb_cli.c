@@ -10,6 +10,7 @@
 
 #include "main.h"
 #include "app_constants.h"
+#include "can_protocol.h"
 #include "scap_io_owner.h"
 
 #include <ctype.h>
@@ -295,6 +296,7 @@ static void usbcli_cmd_status(void)
   {
     STATUS_AVG_SAMPLES = 1000,
     STATUS_AVG_DELAY_MS = 1,
+    STATUS_CAN_VALID_MS = 1000,
   };
 
   int64_t sum_v_bus_mV = 0;
@@ -329,6 +331,12 @@ static void usbcli_cmd_status(void)
 
   const uint32_t telemetry_seq = g_telemetry_seq;
   const uint32_t adc_seq_hz = g_adc_seq_hz;
+  can_command_state_t can_command;
+  CanProtocol_ReadCommandSnapshot(&can_command);
+  const uint32_t can_status_now_ms = HAL_GetTick();
+  const bool can_command_valid =
+      (can_command.can_cmd_timestamp != 0u) &&
+      ((uint32_t)(can_status_now_ms - can_command.can_cmd_timestamp) <= STATUS_CAN_VALID_MS);
   DbgUsb_GetStats(&dbg_stats);
 
   const unsigned swen = (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_SWEN_Pin) != GPIO_PIN_RESET) ? 1u : 0u);
@@ -397,9 +405,18 @@ static void usbcli_cmd_status(void)
   usbcli_printf("  USB telemetry sequence number: %lu\r\n", (unsigned long)telemetry_seq);
   usbcli_printf("  ADC trigger frequency estimate: %lu Hz\r\n", (unsigned long)adc_seq_hz);
   usbcli_printf("  UART receive count: %lu\r\n", (unsigned long)g_uart_rx.uart_rx_count);
-  usbcli_printf("  CAN receive count: %lu\r\n", (unsigned long)g_can_rx.can_rx_count);
   usbcli_printf("  UART link up: %u\r\n", g_uart_connected ? 1u : 0u);
-  usbcli_printf("  CAN link up: %u\r\n", g_can_connected ? 1u : 0u);
+  if (can_command_valid)
+  {
+    usbcli_printf("  CAN command timestamp: %lu ms\r\n", (unsigned long)can_command.can_cmd_timestamp);
+    usbcli_printf("  CAN command power: %u W\r\n", (unsigned)can_command.can_power);
+    usbcli_printf("  CAN command energy: %u J\r\n", (unsigned)can_command.can_energy);
+    usbcli_printf("  CAN command SWEN: %u\r\n", can_command.can_swen ? 1u : 0u);
+  }
+  else
+  {
+    usbcli_puts("no valid cmd received\r\n");
+  }
 
   const int32_t chassis_power_limit_w = (int32_t)(g_uart_rx.chassis_power_limit_w + 0.5f);
   const int32_t buf_mj = (int32_t)(g_uart_rx.buf_e_j * 1000.0f);

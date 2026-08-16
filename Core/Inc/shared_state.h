@@ -86,22 +86,6 @@ extern volatile uint32_t g_telemetry_seq;
 extern volatile uint16_t g_adc1_dma_buf[2];
 extern volatile uint16_t g_adc2_dma_buf[3];
 
-/*
- * CAN receive ISR state.
- */
-typedef struct
-{
-  uint32_t last_can_tick;
-  uint32_t last_cmd_tick;
-  uint32_t can_rx_count;
-  uint8_t settings_raw; // raw settings byte; currently only bit0 (SWEN request) is used
-  uint16_t can_power;//alternate power limit source from CAN
-  uint8_t can_buf;//alternate buffer energy source from CAN
-  bool en;//enable switching
-} can_rx_state_t;
-
-extern volatile can_rx_state_t g_can_rx;
-
 typedef enum
 {
   SRC_MANUAL = 0, // cli request
@@ -124,12 +108,10 @@ typedef struct
 extern volatile uart_rx_state_t g_uart_rx;
 
 /*
- * Derived connection status flags (RX activity-based).
+ * Derived UART connection status flag (RX activity-based).
  * Updated from the 1 kHz slow task.
  */
-extern volatile bool g_can_connected;
 extern volatile bool g_uart_connected;
-extern volatile bool g_can_cmd_connected;
 
 /*
  * Control source for power-stage IO (SWEN/MODE/DIR).
@@ -139,8 +121,7 @@ extern volatile bool g_can_cmd_connected;
 /*
  * Resolved "current buffer energy" (J) for use in control/telemetry:
  * - When UART link is up, mirrors `g_uart_rx.buf_e_j`.
- * - Else when CAN command packets are fresh, mirrors `g_can_rx.can_buf` (unit/scaling depends on sender).
- * - Else 0.
+ * - Else -1.
  *
  * Written from the fast DMA ISR; read from task/CLI contexts.
  */

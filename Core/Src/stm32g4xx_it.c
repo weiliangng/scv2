@@ -26,6 +26,7 @@
 #include "stm32g4xx_ll_dma.h"
 #include "stm32g4xx_ll_gpio.h"
 #include "app_constants.h"
+#include "can_protocol.h"
 #include "shared_state.h"
 #include "scap_io_owner.h"
 #include "referee_uart.h"
@@ -293,7 +294,6 @@ void DMA1_Channel1_IRQHandler(void)
 
     float curr_buf;
     if (g_uart_connected) curr_buf = g_uart_rx.buf_e_j;
-    else if (g_can_cmd_connected) curr_buf = (float)g_can_rx.can_buf;
     else curr_buf = -1.0f;
     g_curr_buf_e_j = curr_buf;
 
@@ -489,33 +489,19 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
       break;
     }
 
-    if (rxh.IdType != FDCAN_STANDARD_ID)
+    if ((rxh.IdType != FDCAN_STANDARD_ID) ||
+        (rxh.RxFrameType != FDCAN_DATA_FRAME) ||
+        (rxh.Identifier != SUPERCAP_NODE_ID))
     {
       continue;
     }
 
-    if (rxh.DataLength < FDCAN_DLC_BYTES_4)
+    if (rxh.DataLength != FDCAN_DLC_BYTES_5)
     {
       continue;
     }
 
-    g_can_rx.last_can_tick = HAL_GetTick();
-    g_can_rx.can_rx_count++;
-
-    if (rxh.Identifier == SCAP_CMD_ID)
-    {
-      const uint8_t settings = d[0];
-
-      g_can_rx.settings_raw = settings;
-      g_can_rx.en = (settings & (1u << 0)) != 0u;//bit0: enable or disable SWEN (other bits reserved)
-      ScapIo_AutoSetSwenFromCanIsr(g_can_rx.en);
-
-      g_can_rx.last_cmd_tick = g_can_rx.last_can_tick;
-      g_can_rx.can_power = (uint16_t)d[1] | ((uint16_t)d[2] << 8);//alternate source of power limit if UART breaks down
-      g_can_rx.can_buf = d[3];//alternate source of current buffer energy if UART breaks down
-
-      continue;
-    }
+    (void)CanProtocol_TryAcceptCommand(d, sizeof(incoming_msg_packet), HAL_GetTick());
   }
 }
 

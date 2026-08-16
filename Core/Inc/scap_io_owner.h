@@ -36,5 +36,4 @@ extern volatile uint16_t g_pb_manual;
 extern volatile uint8_t g_swen_auto_req;
 extern volatile uint8_t g_swen_force_low_slow;
 
-void ScapIo_AutoSetSwenFromCanIsr(bool swen_high);
 void ScapIo_ButtonToggleSwenIsr(void);

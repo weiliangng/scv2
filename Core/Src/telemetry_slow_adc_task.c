@@ -13,6 +13,7 @@
 #include "task.h"
 
 #include "app_constants.h"
+#include "can_protocol.h"
 #include "shared_state.h"
 #include "scap_io_owner.h"
 
@@ -72,26 +73,8 @@ static inline float clamp_p_set_w(float p_w)
   return p_w;
 }
 
-static void update_rx_connection_status_1khz(void)
+static void update_uart_connection_status_1khz(void)
 {
-  const uint32_t now_ms = HAL_GetTick();
-
-  bool can_connected = false;
-  if (g_can_rx.can_rx_count != 0u)
-  {
-    const uint32_t last_ms = g_can_rx.last_can_tick;
-    can_connected = ((uint32_t)(now_ms - last_ms) <= CAN_RX_LINK_TIMEOUT_MS);
-  }
-  g_can_connected = can_connected;
-
-  bool can_cmd_connected = false;
-  if (g_can_rx.can_rx_count != 0u)
-  {
-    const uint32_t last_cmd_ms = g_can_rx.last_cmd_tick;
-    can_cmd_connected = ((uint32_t)(now_ms - last_cmd_ms) <= CAN_CMD_TIMEOUT_MS);
-  }
-  g_can_cmd_connected = can_cmd_connected;
-
   bool uart_connected = false;
   if (g_uart_rx.uart_rx_count != 0u)
   {
@@ -117,10 +100,6 @@ static void update_p_set_1khz(void)
     {
       p_set_w = g_uart_rx.chassis_power_limit_w;
     }
-    else if (g_can_cmd_connected)
-    {
-      p_set_w = (float)g_can_rx.can_power;
-    }
     else
     {
       p_set_w = P_SET_DEFAULT_W;
@@ -136,7 +115,7 @@ void TelemetrySlowAdcTask_Run(void const *argument)
 
   static const uint8_t status_code = 0u;
   FDCAN_TxHeaderTypeDef tx_header = {
-      .Identifier = SCAP_STAT_ID,
+      .Identifier = DEVC_NODE_ID,
       .IdType = FDCAN_STANDARD_ID,
       .TxFrameType = FDCAN_DATA_FRAME,
       .DataLength = FDCAN_DLC_BYTES_8,
@@ -167,7 +146,7 @@ void TelemetrySlowAdcTask_Run(void const *argument)
   for (;;)
   {
     ScapIo_Tick1kHz();
-    update_rx_connection_status_1khz();
+    update_uart_connection_status_1khz();
     update_p_set_1khz();
 
     const uint16_t n_adc_imonop = g_adc2_dma_buf[1] & 0x0FFFU;

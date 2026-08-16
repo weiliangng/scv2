@@ -62,18 +62,10 @@ void AppConstants_InitFromNvm(void);
 bool AppConstants_LoadFromNvm(void);
 bool AppConstants_SaveToNvm(void);
 
-// Classic CAN (standard 11-bit IDs)
-extern const uint32_t SCAP_STAT_ID; // status/telemetry packets sent out from supercap
-extern const uint32_t SCAP_CMD_ID;  // command/setpoint to supercap
 extern const uint32_t SCAP_STAT_RATE_HZ; // 10..1000
 
 // Simple "link up" heuristics based on most recent RX timestamp.
 // 0 RX since boot => link down.
-extern const uint32_t CAN_RX_LINK_TIMEOUT_MS;
 extern const uint32_t UART_RX_LINK_TIMEOUT_MS;
-
-// CAN command freshness timeout (based on `g_can_rx.last_cmd_tick`).
-// Used for CAN IO ownership + CAN P_set override eligibility.
-extern const uint32_t CAN_CMD_TIMEOUT_MS;
 
 #endif /* APP_CONSTANTS_H */

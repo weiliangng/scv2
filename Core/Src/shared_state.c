@@ -22,12 +22,9 @@ volatile uint32_t g_telemetry_seq;
 volatile uint16_t g_adc1_dma_buf[2];
 volatile uint16_t g_adc2_dma_buf[3];
 
-volatile can_rx_state_t g_can_rx;
 volatile uart_rx_state_t g_uart_rx;
 
-volatile bool g_can_connected;
 volatile bool g_uart_connected;
-volatile bool g_can_cmd_connected;
 
 volatile float g_curr_buf_e_j = 0.0f;
 

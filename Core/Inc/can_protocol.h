@@ -1,0 +1,50 @@
+#ifndef CAN_PROTOCOL_H
+#define CAN_PROTOCOL_H
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#define SUPERCAP_NODE_ID 0x067u
+#define DEVC_NODE_ID 0x077u
+
+#define CAN_POWER_MIN_W 50u
+#define CAN_POWER_MAX_W 120u
+#define CAN_ENERGY_MIN_J 0u
+#define CAN_ENERGY_MAX_J 60u
+
+/* Reserved for future control consumers; current consumers are diagnostic only. */
+#define CAN_COMMAND_FRESHNESS_TIMEOUT_MS 500u
+
+/* Command sent from DEVC to the supercap board. energy_buffer is little-endian. */
+typedef struct __attribute__((packed))
+{
+  uint8_t enable_module;
+  uint8_t reset;
+  uint8_t pow_limit;
+  uint16_t energy_buffer;
+} incoming_msg_packet;
+
+_Static_assert(sizeof(incoming_msg_packet) == 5u, "incoming_msg_packet must be exactly 5 bytes");
+
+typedef struct
+{
+  uint32_t can_cmd_timestamp;
+  uint8_t can_power;
+  uint16_t can_energy;
+  bool can_swen;
+} can_command_state_t;
+
+/* Timestamp zero means that no valid command has been accepted. */
+extern volatile can_command_state_t g_can_command;
+
+/*
+ * Validate and publish one wire command. Invalid packets leave the mailbox
+ * unchanged. timestamp_ms must be nonzero to preserve the empty-mailbox sentinel.
+ */
+bool CanProtocol_TryAcceptCommand(const uint8_t *data, size_t data_len, uint32_t timestamp_ms);
+
+/* Take a coherent task-context snapshot of the ISR-written mailbox. */
+void CanProtocol_ReadCommandSnapshot(can_command_state_t *snapshot);
+
+#endif /* CAN_PROTOCOL_H */
