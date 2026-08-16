@@ -507,6 +507,15 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
   }
 }
 
+void HAL_FDCAN_ErrorStatusCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t ErrorStatusITs)
+{
+  if ((ErrorStatusITs & FDCAN_IT_BUS_OFF) != 0U)
+  {
+    /* FDCAN requires software to leave INIT after bus-off. */
+    CLEAR_BIT(hfdcan->Instance->CCCR, FDCAN_CCCR_INIT);
+  }
+}
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if (GPIO_Pin != GPIO_PIN_13)
