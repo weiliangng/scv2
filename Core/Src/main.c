@@ -729,8 +729,8 @@ static void MX_FDCAN1_Init(void)
    * Must be called before HAL_FDCAN_Start().
    */
   if (HAL_FDCAN_ConfigGlobalFilter(&hfdcan1,
-                                  FDCAN_REJECT,         /* NonMatchingStd */
-                                  FDCAN_REJECT,         /* NonMatchingExt */
+                                  FDCAN_ACCEPT_IN_RX_FIFO1, /* NonMatchingStd */
+                                  FDCAN_ACCEPT_IN_RX_FIFO1, /* NonMatchingExt */
                                   FDCAN_REJECT_REMOTE,  /* RejectRemoteStd */
                                   FDCAN_REJECT_REMOTE   /* RejectRemoteExt */
                                   ) != HAL_OK)
@@ -1181,7 +1181,7 @@ void StartTelemetryTask(void const * argument)
   static uint32_t last_adc_rate_ms = 0U;
   static uint32_t last_adc_seq_count = 0U;
   static uint32_t adc_seq_hz = 0U;
-  char msg[320];
+  char msg[384];
   for(;;)
   {
     if (!g_telemetry_enabled)
@@ -1227,6 +1227,7 @@ void StartTelemetryTask(void const * argument)
     can_command_state_t can_command;
     CanProtocol_ReadCommandSnapshot(&can_command);
     const uint32_t uart_up = g_uart_connected ? 1u : 0u;
+    const uint32_t can_bus_up = CanProtocol_IsBusActive(now_ms) ? 1u : 0u;
     const int32_t v_bus_mV = (int32_t)(v_bus * 1000.0f);
     const int32_t v_cap_mV = (int32_t)(v_cap * 1000.0f);
     const int32_t i_load_mA = (int32_t)(i_load * 1000.0f);
@@ -1241,7 +1242,7 @@ void StartTelemetryTask(void const * argument)
     const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld uart_rx=%lu can_cmd_ts_ms=%lu can_power_W=%u can_energy_J=%u can_swen=%u uart_up=%lu adc_hz=%lu dlast=%lu dmax=%lu\r\n",
+                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld uart_rx=%lu can_cmd_ts_ms=%lu can_power_W=%u can_energy_J=%u can_swen=%u uart_up=%lu can_bus_up=%lu adc_hz=%lu dlast=%lu dmax=%lu\r\n",
                        (unsigned long)hello_seq++,
                        (long)v_bus_mV,
                        (long)v_cap_mV,
@@ -1258,6 +1259,7 @@ void StartTelemetryTask(void const * argument)
                        (unsigned)can_command.can_energy,
                        can_command.can_swen ? 1u : 0u,
                        (unsigned long)uart_up,
+                       (unsigned long)can_bus_up,
                        (unsigned long)adc_seq_hz,
                        (unsigned long)dma1_ch1_cycles_last,
                        (unsigned long)dma1_ch1_cycles_max);

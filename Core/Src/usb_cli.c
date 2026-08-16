@@ -337,6 +337,7 @@ static void usbcli_cmd_status(void)
   const bool can_command_valid =
       (can_command.can_cmd_timestamp != 0u) &&
       ((uint32_t)(can_status_now_ms - can_command.can_cmd_timestamp) <= STATUS_CAN_VALID_MS);
+  const bool can_bus_up = CanProtocol_IsBusActive(can_status_now_ms);
   DbgUsb_GetStats(&dbg_stats);
 
   const unsigned swen = (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_SWEN_Pin) != GPIO_PIN_RESET) ? 1u : 0u);
@@ -406,6 +407,7 @@ static void usbcli_cmd_status(void)
   usbcli_printf("  ADC trigger frequency estimate: %lu Hz\r\n", (unsigned long)adc_seq_hz);
   usbcli_printf("  UART receive count: %lu\r\n", (unsigned long)g_uart_rx.uart_rx_count);
   usbcli_printf("  UART link up: %u\r\n", g_uart_connected ? 1u : 0u);
+  usbcli_printf("  CAN bus activity up: %u\r\n", can_bus_up ? 1u : 0u);
   if (can_command_valid)
   {
     usbcli_printf("  CAN command timestamp: %lu ms\r\n", (unsigned long)can_command.can_cmd_timestamp);

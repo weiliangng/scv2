@@ -489,6 +489,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
       break;
     }
 
+    CanProtocol_NoteBusActivity(HAL_GetTick());
+
     if ((rxh.IdType != FDCAN_STANDARD_ID) ||
         (rxh.RxFrameType != FDCAN_DATA_FRAME) ||
         (rxh.Identifier != SUPERCAP_NODE_ID))

@@ -3,6 +3,8 @@
 #include "main.h"
 
 volatile can_command_state_t g_can_command;
+static volatile uint32_t s_can_bus_activity_timestamp;
+static volatile bool s_can_bus_activity_seen;
 
 bool CanProtocol_TryAcceptCommand(const uint8_t *data, size_t data_len, uint32_t timestamp_ms)
 {
@@ -27,6 +29,48 @@ bool CanProtocol_TryAcceptCommand(const uint8_t *data, size_t data_len, uint32_t
   g_can_command.can_swen = (enable_module != 0u);
   g_can_command.can_cmd_timestamp = timestamp_ms;
   return true;
+}
+
+void CanProtocol_NoteBusActivity(uint32_t timestamp_ms)
+{
+  s_can_bus_activity_timestamp = timestamp_ms;
+  s_can_bus_activity_seen = true;
+}
+
+void CanProtocol_PollBusActivity(void)
+{
+  const uint32_t fill_level = HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO1);
+  if (fill_level == 0u)
+  {
+    return;
+  }
+
+  CanProtocol_NoteBusActivity(HAL_GetTick());
+
+  FDCAN_RxHeaderTypeDef rx_header;
+  uint8_t data[8];
+  for (uint32_t i = 0u; i < fill_level; i++)
+  {
+    if (HAL_FDCAN_GetRxMessage(&hfdcan1, FDCAN_RX_FIFO1, &rx_header, data) != HAL_OK)
+    {
+      break;
+    }
+  }
+}
+
+bool CanProtocol_IsBusActive(uint32_t now_ms)
+{
+  const uint32_t primask = __get_PRIMASK();
+  __disable_irq();
+  const uint32_t activity_timestamp = s_can_bus_activity_timestamp;
+  const bool activity_seen = s_can_bus_activity_seen;
+  if (primask == 0u)
+  {
+    __enable_irq();
+  }
+
+  return activity_seen &&
+         ((uint32_t)(now_ms - activity_timestamp) <= CAN_BUS_ACTIVITY_TIMEOUT_MS);
 }
 
 void CanProtocol_ReadCommandSnapshot(can_command_state_t *snapshot)

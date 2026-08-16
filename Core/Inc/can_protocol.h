@@ -16,6 +16,10 @@
 /* Reserved for future control consumers; current consumers are diagnostic only. */
 #define CAN_COMMAND_FRESHNESS_TIMEOUT_MS 500u
 
+/* Diagnostic-only CAN bus activity monitor. */
+#define CAN_BUS_ACTIVITY_POLL_MS 100u
+#define CAN_BUS_ACTIVITY_TIMEOUT_MS 200u
+
 /* Command sent from DEVC to the supercap board. energy_buffer is little-endian. */
 typedef struct __attribute__((packed))
 {
@@ -43,6 +47,15 @@ extern volatile can_command_state_t g_can_command;
  * unchanged. timestamp_ms must be nonzero to preserve the empty-mailbox sentinel.
  */
 bool CanProtocol_TryAcceptCommand(const uint8_t *data, size_t data_len, uint32_t timestamp_ms);
+
+/* Record activity from an accepted RX FIFO frame. Safe from ISR or task context. */
+void CanProtocol_NoteBusActivity(uint32_t timestamp_ms);
+
+/* Poll and discard the bounded FIFO1 activity sample. Call from task context. */
+void CanProtocol_PollBusActivity(void);
+
+/* True when accepted CAN traffic has been observed within the activity timeout. */
+bool CanProtocol_IsBusActive(uint32_t now_ms);
 
 /* Take a coherent task-context snapshot of the ISR-written mailbox. */
 void CanProtocol_ReadCommandSnapshot(can_command_state_t *snapshot);

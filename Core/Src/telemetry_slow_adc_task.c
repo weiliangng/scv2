@@ -142,6 +142,7 @@ void TelemetrySlowAdcTask_Run(void const *argument)
   }
 
   uint32_t last_tx_ms = HAL_GetTick() - period_ms;
+  uint32_t last_can_bus_poll_ms = HAL_GetTick() - CAN_BUS_ACTIVITY_POLL_MS;
 
   for (;;)
   {
@@ -164,6 +165,12 @@ void TelemetrySlowAdcTask_Run(void const *argument)
     g_latest.i_out = i_out;
 
     const uint32_t now_ms = HAL_GetTick();
+    if ((uint32_t)(now_ms - last_can_bus_poll_ms) >= CAN_BUS_ACTIVITY_POLL_MS)
+    {
+      last_can_bus_poll_ms = now_ms;
+      CanProtocol_PollBusActivity();
+    }
+
     if ((uint32_t)(now_ms - last_tx_ms) >= period_ms)
     {
       last_tx_ms = now_ms;
