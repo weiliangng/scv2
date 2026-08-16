@@ -89,9 +89,6 @@ extern volatile uint16_t g_adc2_dma_buf[3];
 /*
  * CAN receive ISR state.
  */
-extern volatile float meter_v; // Volts from wattmeter (ID=METER_ID, decoded from ×100)
-extern volatile float meter_i; // Amps  from wattmeter (ID=METER_ID, decoded from ×100)
-
 typedef struct
 {
   uint32_t last_can_tick;

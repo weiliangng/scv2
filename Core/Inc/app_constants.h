@@ -64,7 +64,6 @@ bool AppConstants_SaveToNvm(void);
 
 // Classic CAN (standard 11-bit IDs)
 extern const uint32_t SCAP_STAT_ID; // status/telemetry packets sent out from supercap
-extern const uint32_t METER_ID;     // wattmeter -> (V/I scaled x100)
 extern const uint32_t SCAP_CMD_ID;  // command/setpoint to supercap
 extern const uint32_t SCAP_STAT_RATE_HZ; // 10..1000
 

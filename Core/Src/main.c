@@ -715,7 +715,7 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.DataSyncJumpWidth = 1;
   hfdcan1.Init.DataTimeSeg1 = 1;
   hfdcan1.Init.DataTimeSeg2 = 1;
-  hfdcan1.Init.StdFiltersNbr = 2;
+  hfdcan1.Init.StdFiltersNbr = 1;
   hfdcan1.Init.ExtFiltersNbr = 0;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
   if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
@@ -724,7 +724,7 @@ static void MX_FDCAN1_Init(void)
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
   /*
-   * Accept only METER_ID and SCAP_CMD_ID; reject everything else.
+   * Accept only SCAP_CMD_ID; reject everything else.
    * Must be called before HAL_FDCAN_Start().
    */
   if (HAL_FDCAN_ConfigGlobalFilter(&hfdcan1,
@@ -744,13 +744,6 @@ static void MX_FDCAN1_Init(void)
   filter.FilterID2 = 0x7FF; /* exact match mask for 11-bit IDs */
 
   filter.FilterIndex = 0;
-  filter.FilterID1 = METER_ID;
-  if (HAL_FDCAN_ConfigFilter(&hfdcan1, &filter) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  filter.FilterIndex = 1;
   filter.FilterID1 = SCAP_CMD_ID;
   if (HAL_FDCAN_ConfigFilter(&hfdcan1, &filter) != HAL_OK)
   {
@@ -1233,9 +1226,6 @@ void StartTelemetryTask(void const * argument)
     const uint32_t can_rx_count = g_can_rx.can_rx_count;
     const uint32_t can_up = g_can_connected ? 1u : 0u;
     const uint32_t uart_up = g_uart_connected ? 1u : 0u;
-    const float wm_v = meter_v;
-    const float wm_i = meter_i;
-
     const int32_t v_bus_mV = (int32_t)(v_bus * 1000.0f);
     const int32_t v_cap_mV = (int32_t)(v_cap * 1000.0f);
     const int32_t i_load_mA = (int32_t)(i_load * 1000.0f);
@@ -1243,8 +1233,6 @@ void StartTelemetryTask(void const * argument)
     const int32_t i_out_n_mA = (int32_t)(i_out_n * 1000.0f);
     const int32_t i_out_mA = (int32_t)(i_out * 1000.0f);
     const int32_t i_conv_mA = (int32_t)(i_conv * 1000.0f);
-    const int32_t wm_v_mV = (int32_t)(wm_v * 1000.0f);
-    const int32_t wm_i_mA = (int32_t)(wm_i * 1000.0f);
     const int32_t plim_w = (int32_t)(chassis_power_limit_w);
     const int32_t buf_mj = (int32_t)(buf_e_j * 1000.0f);
 
@@ -1252,7 +1240,7 @@ void StartTelemetryTask(void const * argument)
     const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld uart_rx=%lu can_rx=%lu uart_up=%lu can_up=%lu wm_v_mV=%ld wm_i_mA=%ld adc_hz=%lu dlast=%lu dmax=%lu\r\n",
+                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld uart_rx=%lu can_rx=%lu uart_up=%lu can_up=%lu adc_hz=%lu dlast=%lu dmax=%lu\r\n",
                        (unsigned long)hello_seq++,
                        (long)v_bus_mV,
                        (long)v_cap_mV,
@@ -1267,8 +1255,6 @@ void StartTelemetryTask(void const * argument)
                        (unsigned long)can_rx_count,
                        (unsigned long)uart_up,
                        (unsigned long)can_up,
-                       (long)wm_v_mV,
-                       (long)wm_i_mA,
                        (unsigned long)adc_seq_hz,
                        (unsigned long)dma1_ch1_cycles_last,
                        (unsigned long)dma1_ch1_cycles_max);

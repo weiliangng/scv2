@@ -6,9 +6,6 @@ volatile latest_values_t g_latest = {
 
 volatile float g_manual_p_set_w = 50.0f;
 
-volatile float meter_v = 0.0f;
-volatile float meter_i = 0.0f;
-
 const float C_cap = 1822.5f;
 const float V_cap_max = 26.3f;
 const float cap_hi = 0.97f * V_cap_max;

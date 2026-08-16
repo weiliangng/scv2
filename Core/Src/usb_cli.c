@@ -302,8 +302,6 @@ static void usbcli_cmd_status(void)
   int64_t sum_i_load_mA = 0;
   int64_t sum_i_out_mA = 0;
   int64_t sum_i_conv_mA = 0;
-  int64_t sum_wm_v_mV = 0;
-  int64_t sum_wm_i_mA = 0;
   DbgUsbStats dbg_stats;
 
   for (uint32_t i = 0; i < STATUS_AVG_SAMPLES; i++)
@@ -313,16 +311,12 @@ static void usbcli_cmd_status(void)
     const float i_load = g_latest.i_load;
     const float i_out = g_latest.i_out;
     const float i_conv = g_latest.i_conv;
-    const float wm_v = meter_v;
-    const float wm_i = meter_i;
 
     sum_v_bus_mV += (int32_t)(v_bus * 1000.0f);
     sum_v_cap_mV += (int32_t)(v_cap * 1000.0f);
     sum_i_load_mA += (int32_t)(i_load * 1000.0f);
     sum_i_out_mA += (int32_t)(i_out * 1000.0f);
     sum_i_conv_mA += (int32_t)(i_conv * 1000.0f);
-    sum_wm_v_mV += (int32_t)(wm_v * 1000.0f);
-    sum_wm_i_mA += (int32_t)(wm_i * 1000.0f);
 
     osDelay(STATUS_AVG_DELAY_MS);
   }
@@ -332,8 +326,6 @@ static void usbcli_cmd_status(void)
   const int32_t i_load_avg_mA = (int32_t)((sum_i_load_mA + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
   const int32_t i_out_avg_mA = (int32_t)((sum_i_out_mA + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
   const int32_t i_conv_avg_mA = (int32_t)((sum_i_conv_mA + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
-  const int32_t wm_v_avg_mV = (int32_t)((sum_wm_v_mV + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
-  const int32_t wm_i_avg_mA = (int32_t)((sum_wm_i_mA + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
 
   const uint32_t telemetry_seq = g_telemetry_seq;
   const uint32_t adc_seq_hz = g_adc_seq_hz;
@@ -421,9 +413,6 @@ static void usbcli_cmd_status(void)
                 (unsigned long)dbg_stats.telemetry_records_dropped);
   usbcli_printf("  USB telemetry bytes queued: %lu\r\n", (unsigned long)dbg_stats.telemetry_bytes_queued);
   usbcli_printf("  USB disconnects: %lu\r\n", (unsigned long)dbg_stats.usb_disconnect_count);
-
-  usbcli_printf("  Wattmeter voltage (average): %ld mV\r\n", (long)wm_v_avg_mV);
-  usbcli_printf("  Wattmeter current (average): %ld mA\r\n", (long)wm_i_avg_mA);
 
   usbcli_printf("DMA interrupt timing:\r\n");
   usbcli_printf("  DMA1 channel 1 ISR cycles (last): %lu\r\n", (unsigned long)g_dma1_ch1_irq_cycles_last);

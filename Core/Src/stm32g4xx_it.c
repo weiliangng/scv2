@@ -502,16 +502,6 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     g_can_rx.last_can_tick = HAL_GetTick();
     g_can_rx.can_rx_count++;
 
-    if (rxh.Identifier == METER_ID)
-    {
-      const uint16_t raw_v = (uint16_t)d[0] | ((uint16_t)d[1] << 8);
-      const int16_t raw_i = (int16_t)((uint16_t)d[2] | ((uint16_t)d[3] << 8));
-
-      meter_v = (float)raw_v / 100.0f;
-      meter_i = (float)raw_i / 100.0f;
-      continue;
-    }
-
     if (rxh.Identifier == SCAP_CMD_ID)
     {
       const uint8_t settings = d[0];
