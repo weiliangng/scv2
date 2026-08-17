@@ -27,8 +27,8 @@
 #include "stm32g4xx_ll_gpio.h"
 #include "app_constants.h"
 #include "can_protocol.h"
+#include "command_inputs.h"
 #include "shared_state.h"
-#include "scap_io_owner.h"
 #include "referee_uart.h"
 #include "eeprom_emul.h"
 /* USER CODE END Includes */
@@ -292,11 +292,6 @@ void DMA1_Channel1_IRQHandler(void)
     const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
     const float i_load = (A_ILOAD * (float)n_adc_iload) + B_ILOAD;
 
-    float curr_buf;
-    if (g_uart_connected) curr_buf = g_uart_rx.buf_e_j;
-    else curr_buf = -1.0f;
-    g_curr_buf_e_j = curr_buf;
-
     const float p_set = g_latest.p_set;
     float denom = (float)n_adc_vbus + N_OFFSET;
     if (denom < 1.0f) { denom = 1.0f; }
@@ -313,42 +308,23 @@ void DMA1_Channel1_IRQHandler(void)
     g_latest.i_load = i_load;
     g_latest.i_conv = i_conv;
 
-    if (g_ctrl_src == SRC_ALGO)
+    if (i_conv > 0.0f)
     {
-      if (i_conv > 0.0f) {
-        GPIOB->BSRR = GPIO_BSRR_BS1;
-        n_dac_n = n_dac_p;
-      } else {
-        GPIOB->BSRR = GPIO_BSRR_BR1;
-        n_dac_p = n_dac_n;
-      }
-      LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);
+      n_dac_n = n_dac_p;
     }
-
-    uint8_t swen_auto = g_swen_auto_req;
-
-    if (swen_auto != 0u)
+    else
     {
-      swen_auto = (uint8_t)(
-          ((v_cap < V_cap_max) && (curr_buf > 55.0f) && (i_conv > 0.0f)) ||
-          ((v_cap > cap_lo) && (curr_buf < 20.0f) && (i_conv < 0.0f)));
+      n_dac_p = n_dac_n;
     }
+    LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);
 
-    uint8_t desired = 0u;
     const bool is_safe = ScapSafety_IsSafe(v_bus, v_cap);
     g_is_safe = is_safe;
-    if ((is_safe) && (g_swen_force_low_slow == 0u))
+    if (g_swen_last_applied != 0u)
     {
-      const ctrl_src_t src = g_ctrl_src;
-      desired = (src == SRC_MANUAL) ? (((g_pb_manual & GPIO_SWEN_Pin) != 0u) ? 1u : 0u)
-                                    : ((swen_auto != 0u) ? 1u : 0u);
-    }
-
-    if (desired != g_swen_last_applied)
-    {
-      gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, desired ? GPIO_SWEN_Pin : 0u);
-      gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin, desired ? GPIO_LED_Pin : 0u);
-      g_swen_last_applied = desired;
+      gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, 0u);
+      gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin, 0u);
+      g_swen_last_applied = 0u;
     }
   }
   else
@@ -541,7 +517,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   s_has_last_btn_tick = 1u;
   s_last_btn_tick_ms = now_ms;
 
-  ScapIo_ButtonToggleSwenIsr();
+  CommandInputs_TogglePushbuttonSwenFromIsr(now_ms);
 }
 
 /* USER CODE END 1 */

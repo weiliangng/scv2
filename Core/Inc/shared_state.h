@@ -28,12 +28,6 @@ typedef struct
 extern volatile latest_values_t g_latest;
 
 /*
- * Manual CLI "requested power" mailbox.
- * Resolved into `g_latest.p_set` by the slow 1 kHz task based on priority.
- */
-extern volatile float g_manual_p_set_w;
-
-/*
  * Supercap state/telemetry constants.
  */
 extern const float C_cap;
@@ -85,47 +79,6 @@ extern volatile uint32_t g_telemetry_seq;
  */
 extern volatile uint16_t g_adc1_dma_buf[2];
 extern volatile uint16_t g_adc2_dma_buf[3];
-
-typedef enum
-{
-  SRC_MANUAL = 0, // cli request
-  SRC_ALGO = 1,   // default on startup
-} ctrl_src_t;
-
-extern volatile ctrl_src_t g_ctrl_src;
-
-/*
- * UART receive ISR state.
- */
-typedef struct
-{
-  float chassis_power_limit_w;
-  float buf_e_j;
-  uint32_t last_uart_tick;
-  uint32_t uart_rx_count;
-} uart_rx_state_t;
-
-extern volatile uart_rx_state_t g_uart_rx;
-
-/*
- * Derived UART connection status flag (RX activity-based).
- * Updated from the 1 kHz slow task.
- */
-extern volatile bool g_uart_connected;
-
-/*
- * Control source for power-stage IO (SWEN/MODE/DIR).
- * When SRC_ALGO is selected, the fast DMA ISR controls DIR.
- */
-
-/*
- * Resolved "current buffer energy" (J) for use in control/telemetry:
- * - When UART link is up, mirrors `g_uart_rx.buf_e_j`.
- * - Else -1.
- *
- * Written from the fast DMA ISR; read from task/CLI contexts.
- */
-extern volatile float g_curr_buf_e_j;
 
 /*
  * Telemetry stream enable:

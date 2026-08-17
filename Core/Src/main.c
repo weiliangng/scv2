@@ -29,6 +29,7 @@
 #include "usb_cli.h"
 #include "app_constants.h"
 #include "can_protocol.h"
+#include "command_inputs.h"
 #include "shared_state.h"
 #include "telemetry_slow_adc_task.h"
 #include "referee_uart.h"
@@ -1187,7 +1188,7 @@ void StartTelemetryTask(void const * argument)
   static uint32_t last_adc_rate_ms = 0U;
   static uint32_t last_adc_seq_count = 0U;
   static uint32_t adc_seq_hz = 0U;
-  char msg[384];
+  char msg[640];
   for(;;)
   {
     if (!g_telemetry_enabled)
@@ -1227,12 +1228,14 @@ void StartTelemetryTask(void const * argument)
     const float i_out_n = g_latest.i_out_n;
     const float i_out = g_latest.i_out;
     const float i_conv = g_latest.i_conv;
-    const float chassis_power_limit_w = g_uart_rx.chassis_power_limit_w;
-    const float buf_e_j = g_curr_buf_e_j;
-    const uint32_t uart_rx_count = g_uart_rx.uart_rx_count;
     can_command_state_t can_command;
+    uart_command_state_t uart_command;
+    manual_command_state_t manual_command;
+    pushbutton_command_state_t pushbutton_command;
     CanProtocol_ReadCommandSnapshot(&can_command);
-    const uint32_t uart_up = g_uart_connected ? 1u : 0u;
+    CommandInputs_ReadUartSnapshot(&uart_command);
+    CommandInputs_ReadManualSnapshot(&manual_command);
+    CommandInputs_ReadPushbuttonSnapshot(&pushbutton_command);
     const uint32_t can_bus_up = CanProtocol_IsBusActive(now_ms) ? 1u : 0u;
     const int32_t v_bus_mV = (int32_t)(v_bus * 1000.0f);
     const int32_t v_cap_mV = (int32_t)(v_cap * 1000.0f);
@@ -1241,14 +1244,13 @@ void StartTelemetryTask(void const * argument)
     const int32_t i_out_n_mA = (int32_t)(i_out_n * 1000.0f);
     const int32_t i_out_mA = (int32_t)(i_out * 1000.0f);
     const int32_t i_conv_mA = (int32_t)(i_conv * 1000.0f);
-    const int32_t plim_w = (int32_t)(chassis_power_limit_w);
-    const int32_t buf_mj = (int32_t)(buf_e_j * 1000.0f);
+    const int32_t pset_w = (int32_t)g_latest.p_set;
 
     const uint32_t dma1_ch1_cycles_last = g_dma1_ch1_irq_cycles_last;
     const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld plim_W=%ld buf_mJ=%ld uart_rx=%lu can_cmd_ts_ms=%lu can_power_W=%u can_energy_J=%u can_swen=%u uart_up=%lu can_bus_up=%lu adc_hz=%lu dlast=%lu dmax=%lu\r\n",
+                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld pset_W=%ld can_ts_ms=%lu can_power_W=%u can_energy_J=%u can_swen=%u uart_power_ts_ms=%lu uart_power_W=%u uart_energy_ts_ms=%lu uart_energy_J=%u manual_power_ts_ms=%lu manual_power_W=%u manual_swen_ts_ms=%lu manual_swen=%u button_swen_ts_ms=%lu button_swen=%u can_bus_up=%lu adc_hz=%lu dlast=%lu dmax=%lu\r\n",
                        (unsigned long)hello_seq++,
                        (long)v_bus_mV,
                        (long)v_cap_mV,
@@ -1257,14 +1259,21 @@ void StartTelemetryTask(void const * argument)
                        (long)i_out_n_mA,
                        (long)i_out_mA,
                        (long)i_conv_mA,
-                       (long)plim_w,
-                       (long)buf_mj,
-                       (unsigned long)uart_rx_count,
+                       (long)pset_w,
                        (unsigned long)can_command.can_cmd_timestamp,
                        (unsigned)can_command.can_power,
                        (unsigned)can_command.can_energy,
                        can_command.can_swen ? 1u : 0u,
-                       (unsigned long)uart_up,
+                       (unsigned long)uart_command.power_w.timestamp_ms,
+                       (unsigned)uart_command.power_w.value,
+                       (unsigned long)uart_command.energy_j.timestamp_ms,
+                       (unsigned)uart_command.energy_j.value,
+                       (unsigned long)manual_command.power_w.timestamp_ms,
+                       (unsigned)manual_command.power_w.value,
+                       (unsigned long)manual_command.swen.timestamp_ms,
+                       manual_command.swen.value ? 1u : 0u,
+                       (unsigned long)pushbutton_command.swen.timestamp_ms,
+                       pushbutton_command.swen.value ? 1u : 0u,
                        (unsigned long)can_bus_up,
                        (unsigned long)adc_seq_hz,
                        (unsigned long)dma1_ch1_cycles_last,

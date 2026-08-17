@@ -1,39 +1,11 @@
-#pragma once
-
-#include <stdbool.h>
-#include <stdint.h>
-
-#include "shared_state.h"
-
-typedef enum
-{
-  SCAP_MODE_CCM = 0,   // 00
-  SCAP_MODE_HCM = 1,   // 01
-  SCAP_MODE_DCM = 2,   // 10
-  SCAP_MODE_BURST = 3, // 11
-} scap_mode_t;
+#ifndef SCAP_IO_OWNER_H
+#define SCAP_IO_OWNER_H
 
 /*
- * Logical mode mapping knobs:
- * Adjust these two definitions to remap what "bidirectional" and
- * "unidirectional" mean on the external MODE pins.
+ * Fixed staging owner for the power-stage mode pins. Source mailboxes are
+ * intentionally disconnected until the main mode-control rewrite.
  */
-#define BIDIRECTIONAL SCAP_MODE_CCM
-#define UNIDIRECTIONAL SCAP_MODE_HCM
-
 void ScapIo_Init(void);
 void ScapIo_Tick1kHz(void);
 
-void ScapIo_SetFaultLatched(bool fault_latched);
-void ScapIo_RequestSwenPulseMs(uint16_t pulse_ms);
-
-void ScapIo_ManualSetMode(scap_mode_t mode);
-void ScapIo_ManualSetDir(bool dir_high);
-void ScapIo_ManualSetSwen(bool swen_high);
-
-/* ISR-facing SWEN plumbing (SWEN is applied from ISR context). */
-extern volatile uint16_t g_pb_manual;
-extern volatile uint8_t g_swen_auto_req;
-extern volatile uint8_t g_swen_force_low_slow;
-
-void ScapIo_ButtonToggleSwenIsr(void);
+#endif /* SCAP_IO_OWNER_H */

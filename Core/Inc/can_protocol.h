@@ -5,13 +5,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "command_inputs.h"
+
 #define SUPERCAP_NODE_ID 0x067u
 #define DEVC_NODE_ID 0x077u
 
-#define CAN_POWER_MIN_W 50u
-#define CAN_POWER_MAX_W 120u
-#define CAN_ENERGY_MIN_J 0u
-#define CAN_ENERGY_MAX_J 60u
+#define CAN_POWER_MIN_W COMMAND_POWER_MIN_W
+#define CAN_POWER_MAX_W COMMAND_POWER_MAX_W
+#define CAN_ENERGY_MIN_J COMMAND_ENERGY_MIN_J
+#define CAN_ENERGY_MAX_J COMMAND_ENERGY_MAX_J
 
 /* Reserved for future control consumers; current consumers are diagnostic only. */
 #define CAN_COMMAND_FRESHNESS_TIMEOUT_MS 500u

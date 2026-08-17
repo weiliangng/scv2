@@ -11,7 +11,7 @@
 #include "main.h"
 #include "app_constants.h"
 #include "can_protocol.h"
-#include "scap_io_owner.h"
+#include "command_inputs.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -276,11 +276,8 @@ static void usbcli_cmd_help(void)
       "  help\r\n"
       "  status\r\n"
       "  telemetry on|off|toggle\r\n"
-      "  ctrl <auto|manual>\r\n"
-      "  pset <0..240>\r\n"
+      "  pset <50..120>\r\n"
       "  swen <0|1>\r\n"
-      "  mode <ccm|hcm|dcm|burst>\r\n"
-      "  dir <0|1>\r\n"
       "  gpio write <PA10|PB1|...> <0|1>\r\n"
       "  gpio toggle <PA10|PB1|...>\r\n"
       "  dac set <1|3> <1|2> <0..4095>\r\n"
@@ -332,7 +329,13 @@ static void usbcli_cmd_status(void)
   const uint32_t telemetry_seq = g_telemetry_seq;
   const uint32_t adc_seq_hz = g_adc_seq_hz;
   can_command_state_t can_command;
+  uart_command_state_t uart_command;
+  manual_command_state_t manual_command;
+  pushbutton_command_state_t pushbutton_command;
   CanProtocol_ReadCommandSnapshot(&can_command);
+  CommandInputs_ReadUartSnapshot(&uart_command);
+  CommandInputs_ReadManualSnapshot(&manual_command);
+  CommandInputs_ReadPushbuttonSnapshot(&pushbutton_command);
   const uint32_t can_status_now_ms = HAL_GetTick();
   const bool can_command_valid =
       (can_command.can_cmd_timestamp != 0u) &&
@@ -354,21 +357,9 @@ static void usbcli_cmd_status(void)
   const uint32_t dac1_2_mV = (uint32_t)((dac1_2_u12 * 3300u + 2047u) / 4095u);
   const uint32_t dac3_1_mV = (uint32_t)((dac3_1_u12 * 3300u + 2047u) / 4095u);
 
-  const char *src = "unknown";
-  switch (g_ctrl_src)
-  {
-  case SRC_MANUAL:
-    src = "manual";
-    break;
-  case SRC_ALGO:
-  default:
-    src = "auto";
-    break;
-  }
-
   usbcli_printf("Control:\r\n");
   usbcli_printf("  Telemetry streaming enabled: %s\r\n", g_telemetry_enabled ? "yes" : "no");
-  usbcli_printf("  Control mode: %s\r\n", src);
+  usbcli_printf("  Staging mode: fixed outputs; source mailboxes disconnected\r\n");
   usbcli_printf("  Switch enable output (SWEN) pin: %u\r\n", swen);
   usbcli_printf("  Mode selection pins (MODE[1:0]): %u%u (decoded=%u)\r\n", mode_msb, mode_lsb, mode_u2);
   usbcli_printf("  Direction pin (DIR): %u\r\n", dir);
@@ -398,15 +389,11 @@ static void usbcli_cmd_status(void)
   usbcli_printf("  Output current (average): %ld mA\r\n", (long)i_out_avg_mA);
   usbcli_printf("  Converter current command (I_conv) (average): %ld mA\r\n", (long)i_conv_avg_mA);
 
-  const float p_set = g_latest.p_set;
-  const int32_t p_set_w = (int32_t)(p_set + ((p_set >= 0.0f) ? 0.5f : -0.5f));
-  usbcli_printf("  Power setpoint: %ld W\r\n", (long)p_set_w);
+  usbcli_printf("  Power setpoint: 50 W (staging default)\r\n");
 
   usbcli_printf("Telemetry and link status:\r\n");
   usbcli_printf("  USB telemetry sequence number: %lu\r\n", (unsigned long)telemetry_seq);
   usbcli_printf("  ADC trigger frequency estimate: %lu Hz\r\n", (unsigned long)adc_seq_hz);
-  usbcli_printf("  UART receive count: %lu\r\n", (unsigned long)g_uart_rx.uart_rx_count);
-  usbcli_printf("  UART link up: %u\r\n", g_uart_connected ? 1u : 0u);
   usbcli_printf("  CAN bus activity up: %u\r\n", can_bus_up ? 1u : 0u);
   if (can_command_valid)
   {
@@ -419,13 +406,51 @@ static void usbcli_cmd_status(void)
   {
     usbcli_puts("no valid cmd received\r\n");
   }
-
-  const int32_t chassis_power_limit_w = (int32_t)(g_uart_rx.chassis_power_limit_w + 0.5f);
-  const int32_t buf_mj = (int32_t)(g_uart_rx.buf_e_j * 1000.0f);
-  const int32_t curr_buf_mj = (int32_t)(g_curr_buf_e_j * 1000.0f);
-  usbcli_printf("  Chassis power limit (UART): %ld W\r\n", (long)chassis_power_limit_w);
-  usbcli_printf("  Buffer energy (UART): %ld mJ\r\n", (long)buf_mj);
-  usbcli_printf("  Buffer energy (resolved): %ld mJ\r\n", (long)curr_buf_mj);
+  if (uart_command.power_w.present)
+  {
+    usbcli_printf("  UART power timestamp: %lu ms\r\n", (unsigned long)uart_command.power_w.timestamp_ms);
+    usbcli_printf("  UART power: %u W\r\n", (unsigned)uart_command.power_w.value);
+  }
+  else
+  {
+    usbcli_printf("  UART power: no valid value\r\n");
+  }
+  if (uart_command.energy_j.present)
+  {
+    usbcli_printf("  UART energy timestamp: %lu ms\r\n", (unsigned long)uart_command.energy_j.timestamp_ms);
+    usbcli_printf("  UART energy: %u J\r\n", (unsigned)uart_command.energy_j.value);
+  }
+  else
+  {
+    usbcli_printf("  UART energy: no valid value\r\n");
+  }
+  if (manual_command.power_w.present)
+  {
+    usbcli_printf("  Manual power timestamp: %lu ms\r\n", (unsigned long)manual_command.power_w.timestamp_ms);
+    usbcli_printf("  Manual power: %u W\r\n", (unsigned)manual_command.power_w.value);
+  }
+  else
+  {
+    usbcli_printf("  Manual power: no valid value\r\n");
+  }
+  if (manual_command.swen.present)
+  {
+    usbcli_printf("  Manual SWEN timestamp: %lu ms\r\n", (unsigned long)manual_command.swen.timestamp_ms);
+    usbcli_printf("  Manual SWEN: %u\r\n", manual_command.swen.value ? 1u : 0u);
+  }
+  else
+  {
+    usbcli_printf("  Manual SWEN: no valid value\r\n");
+  }
+  if (pushbutton_command.swen.present)
+  {
+    usbcli_printf("  Pushbutton SWEN timestamp: %lu ms\r\n", (unsigned long)pushbutton_command.swen.timestamp_ms);
+    usbcli_printf("  Pushbutton SWEN: %u\r\n", pushbutton_command.swen.value ? 1u : 0u);
+  }
+  else
+  {
+    usbcli_printf("  Pushbutton SWEN: no valid value\r\n");
+  }
   usbcli_printf("  USB CLI bytes queued: %lu\r\n", (unsigned long)dbg_stats.cli_bytes_queued);
   usbcli_printf("  USB telemetry records queued/dropped: %lu/%lu\r\n",
                 (unsigned long)dbg_stats.telemetry_records_queued,
@@ -467,80 +492,30 @@ static void usbcli_cmd_telemetry(int argc, char **argv)
   usbcli_printf("telemetry=%s\r\n", g_telemetry_enabled ? "on" : "off");
 }
 
-static int usbcli_parse_mode(const char *s, scap_mode_t *out)
-{
-  if ((s == NULL) || (out == NULL))
-  {
-    return 0;
-  }
-
-  if (usbcli_streq(s, "ccm"))
-  {
-    *out = SCAP_MODE_CCM;
-    return 1;
-  }
-  if (usbcli_streq(s, "hcm"))
-  {
-    *out = SCAP_MODE_HCM;
-    return 1;
-  }
-  if (usbcli_streq(s, "dcm"))
-  {
-    *out = SCAP_MODE_DCM;
-    return 1;
-  }
-  if (usbcli_streq(s, "burst"))
-  {
-    *out = SCAP_MODE_BURST;
-    return 1;
-  }
-
-  return 0;
-}
-
 static void usbcli_cmd_pset(int argc, char **argv)
 {
   if (argc < 2)
   {
-    usbcli_printf("usage: pset <0..240>\r\n");
+    usbcli_printf("usage: pset <50..120>\r\n");
     return;
   }
 
   uint32_t w = 0u;
-  if ((!usbcli_parse_u32(argv[1], &w)) || (w > 240u))
+  if ((!usbcli_parse_u32(argv[1], &w)) || (w < COMMAND_POWER_MIN_W) || (w > COMMAND_POWER_MAX_W) ||
+      !CommandInputs_SetPower(&g_manual_command.power_w, (uint16_t)w, HAL_GetTick()))
   {
-    usbcli_printf("usage: pset <0..240>\r\n");
+    usbcli_printf("usage: pset <50..120>\r\n");
     return;
   }
 
-  g_manual_p_set_w = (float)w;
-  g_ctrl_src = SRC_MANUAL;
   usbcli_printf("ok\r\n");
 }
 
 static void usbcli_cmd_ctrl(int argc, char **argv)
 {
-  if (argc < 2)
-  {
-    usbcli_printf("usage: ctrl <auto|manual>\r\n");
-    return;
-  }
-
-  if (usbcli_streq(argv[1], "auto") || usbcli_streq(argv[1], "algo"))
-  {
-    g_ctrl_src = SRC_ALGO;
-  }
-  else if (usbcli_streq(argv[1], "manual"))
-  {
-    g_ctrl_src = SRC_MANUAL;
-  }
-  else
-  {
-    usbcli_printf("usage: ctrl <auto|manual>\r\n");
-    return;
-  }
-
-  usbcli_printf("ok\r\n");
+  (void)argc;
+  (void)argv;
+  usbcli_printf("unavailable: main mode control is staged off\r\n");
 }
 
 static void usbcli_cmd_swen(int argc, char **argv)
@@ -557,44 +532,26 @@ static void usbcli_cmd_swen(int argc, char **argv)
     usbcli_printf("usage: swen <0|1>\r\n");
     return;
   }
-  ScapIo_ManualSetSwen(v != 0u);
+  if (!CommandInputs_SetSwen(&g_manual_command.swen, v != 0u, HAL_GetTick()))
+  {
+    usbcli_printf("err\r\n");
+    return;
+  }
   usbcli_printf("ok\r\n");
 }
 
 static void usbcli_cmd_dir(int argc, char **argv)
 {
-  if (argc < 2)
-  {
-    usbcli_printf("usage: dir <0|1>\r\n");
-    return;
-  }
-
-  uint32_t v = 0u;
-  if ((!usbcli_parse_u32(argv[1], &v)) || (v > 1u))
-  {
-    usbcli_printf("usage: dir <0|1>\r\n");
-    return;
-  }
-  ScapIo_ManualSetDir(v != 0u);
-  usbcli_printf("ok\r\n");
+  (void)argc;
+  (void)argv;
+  usbcli_printf("unavailable: main mode control is staged off\r\n");
 }
 
 static void usbcli_cmd_mode(int argc, char **argv)
 {
-  if (argc < 2)
-  {
-    usbcli_printf("usage: mode <ccm|hcm|dcm|burst>\r\n");
-    return;
-  }
-
-  scap_mode_t m;
-  if (!usbcli_parse_mode(argv[1], &m))
-  {
-    usbcli_printf("usage: mode <ccm|hcm|dcm|burst>\r\n");
-    return;
-  }
-  ScapIo_ManualSetMode(m);
-  usbcli_printf("ok\r\n");
+  (void)argc;
+  (void)argv;
+  usbcli_printf("unavailable: main mode control is staged off\r\n");
 }
 
 
@@ -620,7 +577,8 @@ static void usbcli_cmd_gpio(int argc, char **argv)
 
     if ((port == GPIOB) && ((pin & (GPIO_DIR_Pin | GPIO_SWEN_Pin | GPIO_MODEMSB_Pin | GPIO_MODELSB_Pin)) != 0u))
     {
-      usbcli_printf("note: IO owner may override PB1/PB4/PB5/PB6; use 'ctrl/swen/mode/dir'\r\n");
+      usbcli_printf("err: PB1/PB4/PB5/PB6 are protected by staging control\r\n");
+      return;
     }
 
     HAL_GPIO_WritePin(port, pin, (v != 0U) ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -637,7 +595,8 @@ static void usbcli_cmd_gpio(int argc, char **argv)
     }
     if ((port == GPIOB) && ((pin & (GPIO_DIR_Pin | GPIO_SWEN_Pin | GPIO_MODEMSB_Pin | GPIO_MODELSB_Pin)) != 0u))
     {
-      usbcli_printf("note: IO owner may override PB1/PB4/PB5/PB6; use 'ctrl/swen/mode/dir'\r\n");
+      usbcli_printf("err: PB1/PB4/PB5/PB6 are protected by staging control\r\n");
+      return;
     }
     HAL_GPIO_TogglePin(port, pin);
     usbcli_printf("ok\r\n");
@@ -695,9 +654,9 @@ static void usbcli_cmd_dac(int argc, char **argv)
     return;
   }
 
-  if ((dac_n == 1U) && (g_ctrl_src != SRC_MANUAL))
+  if (dac_n == 1U)
   {
-    usbcli_printf("err: DAC1 updated in ISR (src=auto); run 'ctrl manual' first\r\n");
+    usbcli_printf("err: DAC1 is protected by staging control\r\n");
     return;
   }
 

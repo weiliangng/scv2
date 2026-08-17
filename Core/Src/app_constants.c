@@ -6,8 +6,6 @@
 
 const uint32_t SCAP_STAT_RATE_HZ = 1000u;
 
-const uint32_t UART_RX_LINK_TIMEOUT_MS = 1000u;
-
 const uint32_t VREF_MV = 3300u; // mV (currently unused)
 
 static const float DEFAULT_A_VBUS = 0.009654528478f; // V/count

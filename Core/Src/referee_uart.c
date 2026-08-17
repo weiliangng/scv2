@@ -6,7 +6,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#include "shared_state.h"
+#include "command_inputs.h"
 
 enum
 {
@@ -55,7 +55,6 @@ typedef struct
 
 static UART_HandleTypeDef *s_huart;
 static TaskHandle_t s_parser_task;
-static TaskHandle_t s_control_task;
 static volatile bool s_rx_restart_requested;
 
 static uint8_t s_rx_dma[REFEREE_UART_RX_DMA_SZ];
@@ -137,23 +136,15 @@ static void parser_accept_frame(referee_parser_t *p)
 {
   if (p->cmd_id == REF_CMD_ROBOT_STATUS && p->cap_chassis_power_limit_ok)
   {
-    g_uart_rx.chassis_power_limit_w = (float)p->cap_chassis_power_limit_w;
-    g_uart_rx.last_uart_tick = (uint32_t)xTaskGetTickCount();
-    g_uart_rx.uart_rx_count++;
-    if (s_control_task != NULL)
-    {
-      xTaskNotifyGive(s_control_task);
-    }
+    (void)CommandInputs_SetPower(&g_uart_command.power_w,
+                                 p->cap_chassis_power_limit_w,
+                                 HAL_GetTick());
   }
   else if (p->cmd_id == REF_CMD_POWER_HEAT && p->cap_buffer_energy_ok)
   {
-    g_uart_rx.buf_e_j = (float)p->cap_buffer_energy_j;
-    g_uart_rx.last_uart_tick = (uint32_t)xTaskGetTickCount();
-    g_uart_rx.uart_rx_count++;
-    if (s_control_task != NULL)
-    {
-      xTaskNotifyGive(s_control_task);
-    }
+    (void)CommandInputs_SetEnergy(&g_uart_command.energy_j,
+                                  p->cap_buffer_energy_j,
+                                  HAL_GetTick());
   }
 }
 
@@ -317,11 +308,6 @@ void RefereeUart_UsartIdleIsr(UART_HandleTypeDef *huart)
 
   __HAL_UART_CLEAR_IDLEFLAG(huart);
   notify_parser_from_isr();
-}
-
-void RefereeUart_SetControlTask(void *task_handle)
-{
-  s_control_task = (TaskHandle_t)task_handle;
 }
 
 void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart)

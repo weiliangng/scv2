@@ -4,8 +4,6 @@ volatile latest_values_t g_latest = {
     .p_set = 50.0f,
 };
 
-volatile float g_manual_p_set_w = 50.0f;
-
 const float C_cap = 1822.5f;
 const float V_cap_max = 26.3f;
 const float cap_hi = 0.97f * V_cap_max;
@@ -22,11 +20,4 @@ volatile uint32_t g_telemetry_seq;
 volatile uint16_t g_adc1_dma_buf[2];
 volatile uint16_t g_adc2_dma_buf[3];
 
-volatile uart_rx_state_t g_uart_rx;
-
-volatile bool g_uart_connected;
-
-volatile float g_curr_buf_e_j = 0.0f;
-
-volatile ctrl_src_t g_ctrl_src = SRC_ALGO;
 volatile bool g_telemetry_enabled = false;
