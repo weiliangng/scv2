@@ -19,13 +19,14 @@ bool CanProtocol_TryAcceptCommand(const uint8_t *data, size_t data_len, uint32_t
 
   if ((enable_module > 1u) ||
       (power_w < CAN_POWER_MIN_W) || (power_w > CAN_POWER_MAX_W) ||
-      (energy_j > CAN_ENERGY_MAX_J))
+      ((energy_j > CAN_ENERGY_MAX_J) && (energy_j != CAN_ENERGY_DISABLED_MAGIC_J)))
   {
     return false;
   }
 
   g_can_command.can_power = power_w;
   g_can_command.can_energy = energy_j;
+  g_can_command.can_energy_disabled = (energy_j == CAN_ENERGY_DISABLED_MAGIC_J);
   g_can_command.can_swen = (enable_module != 0u);
   g_can_command.can_cmd_timestamp = timestamp_ms;
   return true;
@@ -85,6 +86,7 @@ void CanProtocol_ReadCommandSnapshot(can_command_state_t *snapshot)
   snapshot->can_cmd_timestamp = g_can_command.can_cmd_timestamp;
   snapshot->can_power = g_can_command.can_power;
   snapshot->can_energy = g_can_command.can_energy;
+  snapshot->can_energy_disabled = g_can_command.can_energy_disabled;
   snapshot->can_swen = g_can_command.can_swen;
   if (primask == 0u)
   {

@@ -422,7 +422,15 @@ static void usbcli_cmd_status(void)
   {
     usbcli_printf("  CAN command timestamp: %lu ms\r\n", (unsigned long)can_command.can_cmd_timestamp);
     usbcli_printf("  CAN command power: %u W\r\n", (unsigned)can_command.can_power);
-    usbcli_printf("  CAN command energy: %u J\r\n", (unsigned)can_command.can_energy);
+    if (can_command.can_energy_disabled)
+    {
+      usbcli_printf("  CAN command energy: disabled (raw %u J)\r\n",
+                    (unsigned)can_command.can_energy);
+    }
+    else
+    {
+      usbcli_printf("  CAN command energy: %u J\r\n", (unsigned)can_command.can_energy);
+    }
     usbcli_printf("  CAN command SWEN: %u\r\n", can_command.can_swen ? 1u : 0u);
   }
   else

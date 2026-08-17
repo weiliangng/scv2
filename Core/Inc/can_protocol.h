@@ -14,6 +14,7 @@
 #define CAN_POWER_MAX_W COMMAND_POWER_MAX_W
 #define CAN_ENERGY_MIN_J COMMAND_ENERGY_MIN_J
 #define CAN_ENERGY_MAX_J COMMAND_ENERGY_MAX_J
+#define CAN_ENERGY_DISABLED_MAGIC_J 777u
 
 /* Reserved for future control consumers; current consumers are diagnostic only. */
 #define CAN_COMMAND_FRESHNESS_TIMEOUT_MS 500u
@@ -38,6 +39,7 @@ typedef struct
   uint32_t can_cmd_timestamp;
   uint8_t can_power;
   uint16_t can_energy;
+  bool can_energy_disabled;
   bool can_swen;
 } can_command_state_t;
 
