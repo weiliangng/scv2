@@ -9,12 +9,22 @@
 #define COMMAND_ENERGY_MIN_J 0u
 #define COMMAND_ENERGY_MAX_J 60u
 
+#define MANUAL_POWER_MIN_W (-240)
+#define MANUAL_POWER_MAX_W 240
+
 typedef struct
 {
   uint16_t value;
   uint32_t timestamp_ms;
   bool present;
 } command_u16_field_t;
+
+typedef struct
+{
+  int16_t value;
+  uint32_t timestamp_ms;
+  bool present;
+} command_i16_field_t;
 
 typedef struct
 {
@@ -25,7 +35,7 @@ typedef struct
 
 typedef struct
 {
-  command_u16_field_t power_w;
+  command_i16_field_t power_w;
   command_bool_field_t swen;
 } manual_command_state_t;
 
@@ -45,6 +55,7 @@ extern volatile uart_command_state_t g_uart_command;
 extern volatile pushbutton_command_state_t g_pushbutton_command;
 
 bool CommandInputs_SetPower(volatile command_u16_field_t *field, uint16_t power_w, uint32_t timestamp_ms);
+bool CommandInputs_SetManualPower(volatile command_i16_field_t *field, int16_t power_w, uint32_t timestamp_ms);
 bool CommandInputs_SetEnergy(volatile command_u16_field_t *field, uint16_t energy_j, uint32_t timestamp_ms);
 bool CommandInputs_SetSwen(volatile command_bool_field_t *field, bool swen, uint32_t timestamp_ms);
 

@@ -1250,7 +1250,7 @@ void StartTelemetryTask(void const * argument)
     const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld pset_W=%ld can_ts_ms=%lu can_power_W=%u can_energy_J=%u can_swen=%u uart_power_ts_ms=%lu uart_power_W=%u uart_energy_ts_ms=%lu uart_energy_J=%u manual_power_ts_ms=%lu manual_power_W=%u manual_swen_ts_ms=%lu manual_swen=%u button_swen_ts_ms=%lu button_swen=%u can_bus_up=%lu adc_hz=%lu dlast=%lu dmax=%lu\r\n",
+                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld pset_W=%ld can_ts_ms=%lu can_power_W=%u can_energy_J=%u can_swen=%u uart_power_ts_ms=%lu uart_power_W=%u uart_energy_ts_ms=%lu uart_energy_J=%u manual_power_ts_ms=%lu manual_power_W=%d manual_swen_ts_ms=%lu manual_swen=%u button_swen_ts_ms=%lu button_swen=%u can_bus_up=%lu adc_hz=%lu dlast=%lu dmax=%lu\r\n",
                        (unsigned long)hello_seq++,
                        (long)v_bus_mV,
                        (long)v_cap_mV,
@@ -1269,7 +1269,7 @@ void StartTelemetryTask(void const * argument)
                        (unsigned long)uart_command.energy_j.timestamp_ms,
                        (unsigned)uart_command.energy_j.value,
                        (unsigned long)manual_command.power_w.timestamp_ms,
-                       (unsigned)manual_command.power_w.value,
+                       (int)manual_command.power_w.value,
                        (unsigned long)manual_command.swen.timestamp_ms,
                        manual_command.swen.value ? 1u : 0u,
                        (unsigned long)pushbutton_command.swen.timestamp_ms,

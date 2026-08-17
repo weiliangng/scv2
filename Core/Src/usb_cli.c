@@ -15,6 +15,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdarg.h>
@@ -117,6 +118,28 @@ static int usbcli_parse_u32(const char *s, uint32_t *out)
   }
 
   *out = (uint32_t)val;
+  return 1;
+}
+
+static int usbcli_parse_i32(const char *s, int32_t *out)
+{
+  char *endp = NULL;
+  long val;
+
+  if ((s == NULL) || (out == NULL))
+  {
+    return 0;
+  }
+
+  errno = 0;
+  val = strtol(s, &endp, 0);
+  if ((errno != 0) || (endp == s) || (endp == NULL) || (*endp != '\0') ||
+      (val < INT32_MIN) || (val > INT32_MAX))
+  {
+    return 0;
+  }
+
+  *out = (int32_t)val;
   return 1;
 }
 
@@ -276,7 +299,7 @@ static void usbcli_cmd_help(void)
       "  help\r\n"
       "  status\r\n"
       "  telemetry on|off|toggle\r\n"
-      "  pset <50..120>\r\n"
+      "  pset <-240..240>\r\n"
       "  swen <0|1>\r\n"
       "  gpio write <PA10|PB1|...> <0|1>\r\n"
       "  gpio toggle <PA10|PB1|...>\r\n"
@@ -427,7 +450,7 @@ static void usbcli_cmd_status(void)
   if (manual_command.power_w.present)
   {
     usbcli_printf("  Manual power timestamp: %lu ms\r\n", (unsigned long)manual_command.power_w.timestamp_ms);
-    usbcli_printf("  Manual power: %u W\r\n", (unsigned)manual_command.power_w.value);
+    usbcli_printf("  Manual power: %d W\r\n", (int)manual_command.power_w.value);
   }
   else
   {
@@ -496,15 +519,15 @@ static void usbcli_cmd_pset(int argc, char **argv)
 {
   if (argc < 2)
   {
-    usbcli_printf("usage: pset <50..120>\r\n");
+    usbcli_printf("usage: pset <-240..240>\r\n");
     return;
   }
 
-  uint32_t w = 0u;
-  if ((!usbcli_parse_u32(argv[1], &w)) || (w < COMMAND_POWER_MIN_W) || (w > COMMAND_POWER_MAX_W) ||
-      !CommandInputs_SetPower(&g_manual_command.power_w, (uint16_t)w, HAL_GetTick()))
+  int32_t w = 0;
+  if ((!usbcli_parse_i32(argv[1], &w)) || (w < MANUAL_POWER_MIN_W) || (w > MANUAL_POWER_MAX_W) ||
+      !CommandInputs_SetManualPower(&g_manual_command.power_w, (int16_t)w, HAL_GetTick()))
   {
-    usbcli_printf("usage: pset <50..120>\r\n");
+    usbcli_printf("usage: pset <-240..240>\r\n");
     return;
   }
 

@@ -31,6 +31,26 @@ bool CommandInputs_SetPower(volatile command_u16_field_t *field, uint16_t power_
   return true;
 }
 
+bool CommandInputs_SetManualPower(volatile command_i16_field_t *field, int16_t power_w, uint32_t timestamp_ms)
+{
+  if ((field == NULL) || !command_inputs_timestamp_is_valid(timestamp_ms) ||
+      (power_w < MANUAL_POWER_MIN_W) || (power_w > MANUAL_POWER_MAX_W))
+  {
+    return false;
+  }
+
+  const uint32_t primask = __get_PRIMASK();
+  __disable_irq();
+  field->value = power_w;
+  field->present = true;
+  field->timestamp_ms = timestamp_ms;
+  if (primask == 0u)
+  {
+    __enable_irq();
+  }
+  return true;
+}
+
 bool CommandInputs_SetEnergy(volatile command_u16_field_t *field, uint16_t energy_j, uint32_t timestamp_ms)
 {
   if ((field == NULL) || !command_inputs_timestamp_is_valid(timestamp_ms) ||
