@@ -1221,6 +1221,13 @@ void StartTelemetryTask(void const * argument)
     g_adc_seq_hz = adc_seq_hz;
     g_telemetry_seq = hello_seq;
 
+    /* T1 is a diagnostic snapshot. Values are deliberately sampled from the
+     * existing DMA/register/shared-state snapshots without changing control. */
+    const uint16_t adc_vcap = g_adc1_dma_buf[0] & 0x0FFFu;
+    const uint16_t adc_vbus = g_adc1_dma_buf[1] & 0x0FFFu;
+    const uint16_t adc_iload = g_adc2_dma_buf[0] & 0x0FFFu;
+    const uint16_t adc_iop = g_adc2_dma_buf[1] & 0x0FFFu;
+    const uint16_t adc_ion = g_adc2_dma_buf[2] & 0x0FFFu;
     const float v_bus = g_latest.v_bus;
     const float v_cap = g_latest.v_cap;
     const float i_load = g_latest.i_load;
@@ -1238,7 +1245,15 @@ void StartTelemetryTask(void const * argument)
     CommandInputs_ReadManualSnapshot(&manual_command);
     CommandInputs_ReadPushbuttonSnapshot(&pushbutton_command);
     ScapIo_ReadStatus(&control_status);
+    control_fast_command_t fast_command;
+    ScapIo_ReadFastCommand(&fast_command);
+    DbgUsbStats dbg_stats;
+    DbgUsb_GetStats(&dbg_stats);
+
+    const uint32_t can_valid = can_command.can_cmd_timestamp != 0u ? 1u : 0u;
     const uint32_t can_bus_up = CanProtocol_IsBusActive(now_ms) ? 1u : 0u;
+    const uint32_t uart_swen_req = (control_status.uart_power_fresh &&
+                                    control_status.uart_energy_fresh) ? 1u : 0u;
     const int32_t v_bus_mV = (int32_t)(v_bus * 1000.0f);
     const int32_t v_cap_mV = (int32_t)(v_cap * 1000.0f);
     const int32_t i_load_mA = (int32_t)(i_load * 1000.0f);
@@ -1247,41 +1262,83 @@ void StartTelemetryTask(void const * argument)
     const int32_t i_out_mA = (int32_t)(i_out * 1000.0f);
     const int32_t i_conv_mA = (int32_t)(i_conv * 1000.0f);
     const int32_t pset_w = (int32_t)g_latest.p_set;
-
-    const uint32_t dma1_ch1_cycles_last = g_dma1_ch1_irq_cycles_last;
-    const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
+    const uint32_t swen_out = HAL_GPIO_ReadPin(GPIOB, GPIO_SWEN_Pin) != GPIO_PIN_RESET ? 1u : 0u;
+    const uint32_t dir_out = HAL_GPIO_ReadPin(GPIOB, GPIO_DIR_Pin) != GPIO_PIN_RESET ? 1u : 0u;
+    const uint32_t mode_out =
+        (HAL_GPIO_ReadPin(GPIOB, GPIO_MODEMSB_Pin) != GPIO_PIN_RESET ? 2u : 0u) |
+        (HAL_GPIO_ReadPin(GPIOB, GPIO_MODELSB_Pin) != GPIO_PIN_RESET ? 1u : 0u);
+    const uint32_t rvsoff_out = HAL_GPIO_ReadPin(GPIOB, GPIO_RVSOFF_Pin) != GPIO_PIN_RESET ? 1u : 0u;
+    const uint32_t nsil_out = HAL_GPIO_ReadPin(GPIOB, GPIO_NSIL_Pin) != GPIO_PIN_RESET ? 1u : 0u;
+    const uint32_t led_out = HAL_GPIO_ReadPin(GPIO_LED_GPIO_Port, GPIO_LED_Pin) != GPIO_PIN_RESET ? 1u : 0u;
+    const uint32_t btn_in = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) != GPIO_PIN_RESET ? 1u : 0u;
+    const uint32_t dac1_ch1 = HAL_DAC_GetValue(&hdac1, DAC_CHANNEL_1) & 0x0FFFu;
+    const uint32_t dac1_ch2 = HAL_DAC_GetValue(&hdac1, DAC_CHANNEL_2) & 0x0FFFu;
+    const uint32_t dac3_ch1 = HAL_DAC_GetValue(&hdac3, DAC_CHANNEL_1) & 0x0FFFu;
+    const uint32_t dac3_ch2 = HAL_DAC_GetValue(&hdac3, DAC_CHANNEL_2) & 0x0FFFu;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld pset_W=%ld can_ts_ms=%lu can_power_W=%u can_energy=%s can_energy_raw_J=%u can_swen=%u uart_power_ts_ms=%lu uart_power_W=%u uart_energy_ts_ms=%lu uart_energy_J=%u manual_power_ts_ms=%lu manual_power_W=%d manual_swen_ts_ms=%lu manual_swen=%u button_swen_ts_ms=%lu button_swen=%u can_bus_up=%lu adc_hz=%lu mode=%s dlast=%lu dmax=%lu\r\n",
+                       "T1,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u\r\n",
                        (unsigned long)hello_seq++,
-                       (long)v_bus_mV,
+                       (unsigned long)adc_seq_hz,
+                       (unsigned long)dbg_stats.telemetry_records_dropped,
+                       (unsigned long)g_dma1_ch1_irq_cycles_last,
+                       (unsigned long)g_dma1_ch1_irq_cycles_max,
+                       (unsigned)adc_vcap,
+                       (unsigned)adc_vbus,
+                       (unsigned)adc_iload,
+                       (unsigned)adc_iop,
+                       (unsigned)adc_ion,
                        (long)v_cap_mV,
+                       (long)v_bus_mV,
                        (long)i_load_mA,
                        (long)i_out_p_mA,
                        (long)i_out_n_mA,
                        (long)i_out_mA,
                        (long)i_conv_mA,
                        (long)pset_w,
-                       (unsigned long)can_command.can_cmd_timestamp,
-                       (unsigned)can_command.can_power,
-                       can_command.can_energy_disabled ? "disabled" : "usable",
-                       (unsigned)can_command.can_energy,
-                       can_command.can_swen ? 1u : 0u,
-                       (unsigned long)uart_command.power_w.timestamp_ms,
-                       (unsigned)uart_command.power_w.value,
-                       (unsigned long)uart_command.energy_j.timestamp_ms,
-                       (unsigned)uart_command.energy_j.value,
-                       (unsigned long)manual_command.power_w.timestamp_ms,
-                       (int)manual_command.power_w.value,
-                       (unsigned long)manual_command.swen.timestamp_ms,
-                       manual_command.swen.value ? 1u : 0u,
-                       (unsigned long)pushbutton_command.swen.timestamp_ms,
-                       pushbutton_command.swen.value ? 1u : 0u,
+                       (unsigned long)btn_in,
+                       (unsigned long)dir_out,
+                       (unsigned long)swen_out,
+                       (unsigned long)mode_out,
+                       (unsigned long)rvsoff_out,
+                       (unsigned long)nsil_out,
+                       (unsigned long)led_out,
+                       (unsigned long)dac1_ch1,
+                       (unsigned long)dac1_ch2,
+                       (unsigned long)dac3_ch1,
+                       (unsigned long)dac3_ch2,
+                       (unsigned)control_status.mode_request,
+                       (unsigned)control_status.decision,
+                       fast_command.swen_request ? 1u : 0u,
+                       g_is_safe ? 1u : 0u,
+                       control_status.uvlo_lockout ? 1u : 0u,
+                       control_status.fault_latched ? 1u : 0u,
+                       (unsigned)control_status.fault_bits,
+                       (unsigned)control_status.fault_healthy_ms,
                        (unsigned long)can_bus_up,
-                       (unsigned long)adc_seq_hz,
-                       ScapIo_DecisionName(control_status.decision),
-                       (unsigned long)dma1_ch1_cycles_last,
-                       (unsigned long)dma1_ch1_cycles_max);
+                       (unsigned)can_command.can_power,
+                       (unsigned)can_valid,
+                       control_status.can_fresh ? 1u : 0u,
+                       (unsigned)can_command.can_energy,
+                       (can_valid != 0u && !can_command.can_energy_disabled) ? 1u : 0u,
+                       control_status.can_fresh ? 1u : 0u,
+                       can_command.can_energy_disabled ? 1u : 0u,
+                       can_command.can_swen ? 1u : 0u,
+                       (unsigned)can_valid,
+                       control_status.can_fresh ? 1u : 0u,
+                       (unsigned)uart_command.power_w.value,
+                       uart_command.power_w.present ? 1u : 0u,
+                       control_status.uart_power_fresh ? 1u : 0u,
+                       (unsigned)uart_command.energy_j.value,
+                       uart_command.energy_j.present ? 1u : 0u,
+                       control_status.uart_energy_fresh ? 1u : 0u,
+                       (unsigned)uart_swen_req,
+                       (int)manual_command.power_w.value,
+                       manual_command.power_w.present ? 1u : 0u,
+                       manual_command.swen.value ? 1u : 0u,
+                       manual_command.swen.present ? 1u : 0u,
+                       pushbutton_command.swen.value ? 1u : 0u,
+                       pushbutton_command.swen.present ? 1u : 0u);
     if (len > 0)
     {
       size_t msg_len = (size_t)len;
