@@ -1232,10 +1232,12 @@ void StartTelemetryTask(void const * argument)
     uart_command_state_t uart_command;
     manual_command_state_t manual_command;
     pushbutton_command_state_t pushbutton_command;
+    control_status_t control_status;
     CanProtocol_ReadCommandSnapshot(&can_command);
     CommandInputs_ReadUartSnapshot(&uart_command);
     CommandInputs_ReadManualSnapshot(&manual_command);
     CommandInputs_ReadPushbuttonSnapshot(&pushbutton_command);
+    ScapIo_ReadStatus(&control_status);
     const uint32_t can_bus_up = CanProtocol_IsBusActive(now_ms) ? 1u : 0u;
     const int32_t v_bus_mV = (int32_t)(v_bus * 1000.0f);
     const int32_t v_cap_mV = (int32_t)(v_cap * 1000.0f);
@@ -1250,7 +1252,7 @@ void StartTelemetryTask(void const * argument)
     const uint32_t dma1_ch1_cycles_max = g_dma1_ch1_irq_cycles_max;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld pset_W=%ld can_ts_ms=%lu can_power_W=%u can_energy=%s can_energy_raw_J=%u can_swen=%u uart_power_ts_ms=%lu uart_power_W=%u uart_energy_ts_ms=%lu uart_energy_J=%u manual_power_ts_ms=%lu manual_power_W=%d manual_swen_ts_ms=%lu manual_swen=%u button_swen_ts_ms=%lu button_swen=%u can_bus_up=%lu adc_hz=%lu dlast=%lu dmax=%lu\r\n",
+                       "id=%lu vb_mV=%ld vc_mV=%ld il_mA=%ld iop_mA=%ld ion_mA=%ld io_mA=%ld ic_mA=%ld pset_W=%ld can_ts_ms=%lu can_power_W=%u can_energy=%s can_energy_raw_J=%u can_swen=%u uart_power_ts_ms=%lu uart_power_W=%u uart_energy_ts_ms=%lu uart_energy_J=%u manual_power_ts_ms=%lu manual_power_W=%d manual_swen_ts_ms=%lu manual_swen=%u button_swen_ts_ms=%lu button_swen=%u can_bus_up=%lu adc_hz=%lu mode=%s dlast=%lu dmax=%lu\r\n",
                        (unsigned long)hello_seq++,
                        (long)v_bus_mV,
                        (long)v_cap_mV,
@@ -1277,6 +1279,7 @@ void StartTelemetryTask(void const * argument)
                        pushbutton_command.swen.value ? 1u : 0u,
                        (unsigned long)can_bus_up,
                        (unsigned long)adc_seq_hz,
+                       ScapIo_DecisionName(control_status.decision),
                        (unsigned long)dma1_ch1_cycles_last,
                        (unsigned long)dma1_ch1_cycles_max);
     if (len > 0)

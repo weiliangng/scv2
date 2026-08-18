@@ -50,8 +50,8 @@ extern volatile uint32_t g_dma1_ch1_irq_cycles_max;
 extern volatile uint32_t g_adc_seq_count;
 
 /*
- * Fast safety flag computed in the DMA ISR.
- * True when the measured voltages are within safe limits.
+ * Fast hard-fault health flag computed in the DMA ISR.
+ * UVLO is a non-latching idle lockout and does not make this false.
  */
 extern volatile bool g_is_safe;
 

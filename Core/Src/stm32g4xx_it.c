@@ -31,6 +31,7 @@
 #include "shared_state.h"
 #include "referee_uart.h"
 #include "eeprom_emul.h"
+#include "scap_io_owner.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -71,11 +72,6 @@ static inline uint16_t clamp_u12(int32_t v)
     return 4095;
   }
   return (uint16_t)v;
-}
-
-static inline bool ScapSafety_IsSafe(float v_bus, float v_cap)
-{
-  return (v_bus > 10.0f) && (v_bus < 30.0f) && (v_cap < 30.0f);
 }
 
 /*
@@ -121,6 +117,59 @@ static inline void gpio_write_masked_bsrr(GPIO_TypeDef *port, uint16_t affect_ma
 }
 
 static uint8_t g_swen_last_applied = 0xFFu; /* force first apply */
+
+static uint8_t ScapSafety_FaultBits(float v_bus, float v_cap)
+{
+  uint8_t faults = 0u;
+  if (v_bus >= 30.0f)
+  {
+    faults |= CONTROL_FAULT_VBUS_OVP;
+  }
+  if (v_cap >= 30.0f)
+  {
+    faults |= CONTROL_FAULT_VCAP_OVP;
+  }
+  return faults;
+}
+
+static uint8_t energy_allows_swen(const control_fast_command_t *command, float v_cap, float i_conv)
+{
+  static uint8_t s_charge_vcap_lockout;
+  static uint8_t s_discharge_vcap_lockout;
+
+  if (!command->energy_valid)
+  {
+    /* CAN's disabled-energy sentinel removes the buffer-energy gate. */
+    return 1u;
+  }
+
+  if (s_charge_vcap_lockout != 0u)
+  {
+    if (v_cap <= 25.3f)
+    {
+      s_charge_vcap_lockout = 0u;
+    }
+  }
+  else if (v_cap >= 26.3f)
+  {
+    s_charge_vcap_lockout = 1u;
+  }
+
+  if (s_discharge_vcap_lockout != 0u)
+  {
+    if (v_cap >= 6.26f)
+    {
+      s_discharge_vcap_lockout = 0u;
+    }
+  }
+  else if (v_cap <= 5.26f)
+  {
+    s_discharge_vcap_lockout = 1u;
+  }
+
+  return (uint8_t)(((s_charge_vcap_lockout == 0u) && (command->energy_j > 55u) && (i_conv > 0.0f)) ||
+                   ((s_discharge_vcap_lockout == 0u) && (command->energy_j < 20u) && (i_conv < 0.0f)));
+}
 
 /* USER CODE END 0 */
 
@@ -292,7 +341,9 @@ void DMA1_Channel1_IRQHandler(void)
     const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
     const float i_load = (A_ILOAD * (float)n_adc_iload) + B_ILOAD;
 
-    const float p_set = g_latest.p_set;
+    control_fast_command_t command;
+    ScapIo_ReadFastCommand(&command);
+    const float p_set = command.p_set_w;
     float denom = (float)n_adc_vbus + N_OFFSET;
     if (denom < 1.0f) { denom = 1.0f; }
     const float inv_v_bus = A_VBUS_INV / denom;
@@ -308,23 +359,90 @@ void DMA1_Channel1_IRQHandler(void)
     g_latest.i_load = i_load;
     g_latest.i_conv = i_conv;
 
-    if (i_conv > 0.0f)
+    const uint8_t fault_bits = ScapSafety_FaultBits(v_bus, v_cap);
+    g_is_safe = (fault_bits == 0u);
+    ScapIo_FastUpdateFault(fault_bits);
+    const bool uvlo_lockout = ScapIo_FastUpdateUvlo(v_bus);
+
+    if (ScapIo_IsFaultLatched())
     {
-      n_dac_n = n_dac_p;
+      gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, 0u);
+      const uint32_t fault_led_phase = (g_adc_seq_count / 10000u) & 1u; /* 5 Hz */
+      gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin,
+                             fault_led_phase != 0u ? GPIO_LED_Pin : 0u);
+      g_swen_last_applied = 0u;
+    }
+    else if (uvlo_lockout)
+    {
+      if (i_conv > 0.0f)
+      {
+        gpio_write_masked_bsrr(GPIOB, GPIO_DIR_Pin, GPIO_DIR_Pin);
+        n_dac_n = n_dac_p;
+      }
+      else
+      {
+        gpio_write_masked_bsrr(GPIOB, GPIO_DIR_Pin, 0u);
+        n_dac_p = n_dac_n;
+      }
+      LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);
+      gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, 0u);
+      const uint32_t idle_led_phase = (g_adc_seq_count / 50000u) & 1u; /* 1 Hz */
+      gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin,
+                             idle_led_phase != 0u ? GPIO_LED_Pin : 0u);
+      g_swen_last_applied = 0u;
+    }
+    else if (command.decision == CONTROL_DECISION_DIRECT_GPIO)
+    {
+      g_swen_last_applied = 0xFFu;
     }
     else
     {
-      n_dac_p = n_dac_n;
-    }
-    LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);
+      uint8_t desired_swen = 0u;
+      uint16_t led_desired = 0u;
+      const bool drives_algo = (command.decision == CONTROL_DECISION_MANUAL_SET_ALGO) ||
+                               (command.decision == CONTROL_DECISION_CAN_ALGO) ||
+                               (command.decision == CONTROL_DECISION_UART_ALGO) ||
+                               (command.decision == CONTROL_DECISION_IDLE) ||
+                               (command.decision == CONTROL_DECISION_NO_SOURCE);
 
-    const bool is_safe = ScapSafety_IsSafe(v_bus, v_cap);
-    g_is_safe = is_safe;
-    if (g_swen_last_applied != 0u)
-    {
-      gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, 0u);
-      gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin, 0u);
-      g_swen_last_applied = 0u;
+      if (drives_algo)
+      {
+        if (i_conv > 0.0f)
+        {
+          gpio_write_masked_bsrr(GPIOB, GPIO_DIR_Pin, GPIO_DIR_Pin);
+          n_dac_n = n_dac_p;
+        }
+        else
+        {
+          gpio_write_masked_bsrr(GPIOB, GPIO_DIR_Pin, 0u);
+          n_dac_p = n_dac_n;
+        }
+        LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);
+
+        if ((command.decision == CONTROL_DECISION_IDLE) ||
+            (command.decision == CONTROL_DECISION_NO_SOURCE))
+        {
+          const uint32_t idle_led_phase = (g_adc_seq_count / 50000u) & 1u; /* 1 Hz */
+          led_desired = idle_led_phase != 0u ? GPIO_LED_Pin : 0u;
+        }
+        else if (command.decision == CONTROL_DECISION_MANUAL_SET_ALGO)
+        {
+          desired_swen = command.swen_request ? 1u : 0u;
+        }
+        else
+        {
+          desired_swen = (command.swen_request && energy_allows_swen(&command, v_cap, i_conv)) ? 1u : 0u;
+        }
+        desired_swen = SwenMinOnOff(desired_swen);
+        led_desired = desired_swen != 0u ? GPIO_LED_Pin : 0u;
+      }
+      if (desired_swen != g_swen_last_applied)
+      {
+        gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin,
+                               desired_swen != 0u ? GPIO_SWEN_Pin : 0u);
+        g_swen_last_applied = desired_swen;
+      }
+      gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin, led_desired);
     }
   }
   else
@@ -517,7 +635,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   s_has_last_btn_tick = 1u;
   s_last_btn_tick_ms = now_ms;
 
-  CommandInputs_TogglePushbuttonSwenFromIsr(now_ms);
+  ScapIo_HandlePushbuttonFromIsr(now_ms);
 }
 
 /* USER CODE END 1 */

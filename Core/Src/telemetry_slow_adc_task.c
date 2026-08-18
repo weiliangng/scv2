@@ -17,8 +17,6 @@
 #include "shared_state.h"
 #include "scap_io_owner.h"
 
-#define STAGING_P_SET_W 50.0f
-
 static inline uint16_t clamp_u16(int32_t v)
 {
   if (v < 0)
@@ -95,8 +93,7 @@ void TelemetrySlowAdcTask_Run(void const *argument)
 
   for (;;)
   {
-    ScapIo_Tick1kHz();
-    g_latest.p_set = STAGING_P_SET_W;
+    ScapIo_Resolve1kHz();
 
     const uint16_t n_adc_imonop = g_adc2_dma_buf[1] & 0x0FFFU;
     const uint16_t n_adc_imonon = g_adc2_dma_buf[2] & 0x0FFFU;

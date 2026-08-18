@@ -12,6 +12,7 @@
 #include "app_constants.h"
 #include "can_protocol.h"
 #include "command_inputs.h"
+#include "scap_io_owner.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -299,6 +300,7 @@ static void usbcli_cmd_help(void)
       "  help\r\n"
       "  status\r\n"
       "  telemetry on|off|toggle\r\n"
+      "  ctrl <external|manual|measure|direct>\r\n"
       "  pset <-240..240>\r\n"
       "  swen <0|1>\r\n"
       "  gpio write <PA10|PB1|...> <0|1>\r\n"
@@ -351,6 +353,8 @@ static void usbcli_cmd_status(void)
 
   const uint32_t telemetry_seq = g_telemetry_seq;
   const uint32_t adc_seq_hz = g_adc_seq_hz;
+  control_status_t control_status;
+  ScapIo_ReadStatus(&control_status);
   can_command_state_t can_command;
   uart_command_state_t uart_command;
   manual_command_state_t manual_command;
@@ -382,11 +386,16 @@ static void usbcli_cmd_status(void)
 
   usbcli_printf("Control:\r\n");
   usbcli_printf("  Telemetry streaming enabled: %s\r\n", g_telemetry_enabled ? "yes" : "no");
-  usbcli_printf("  Staging mode: fixed outputs; source mailboxes disconnected\r\n");
+  usbcli_printf("  Current mode: %s\r\n", ScapIo_DecisionName(control_status.decision));
   usbcli_printf("  Switch enable output (SWEN) pin: %u\r\n", swen);
   usbcli_printf("  Mode selection pins (MODE[1:0]): %u%u (decoded=%u)\r\n", mode_msb, mode_lsb, mode_u2);
   usbcli_printf("  Direction pin (DIR): %u\r\n", dir);
   usbcli_printf("  Safety flag (is_safe): %u\r\n", g_is_safe ? 1u : 0u);
+  usbcli_printf("  Fault latched/bits/recovery-ms: %u/0x%02X/%u\r\n",
+                control_status.fault_latched ? 1u : 0u,
+                (unsigned)control_status.fault_bits,
+                (unsigned)control_status.fault_healthy_ms);
+  usbcli_printf("  UVLO lockout: %u\r\n", control_status.uvlo_lockout ? 1u : 0u);
 
   usbcli_printf("Digital-to-analog converter outputs:\r\n");
   usbcli_printf("  DAC1 channel 1 raw: %lu / 4095\r\n", (unsigned long)dac1_1_u12);
@@ -412,12 +421,16 @@ static void usbcli_cmd_status(void)
   usbcli_printf("  Output current (average): %ld mA\r\n", (long)i_out_avg_mA);
   usbcli_printf("  Converter current command (I_conv) (average): %ld mA\r\n", (long)i_conv_avg_mA);
 
-  usbcli_printf("  Power setpoint: 50 W (staging default)\r\n");
+  usbcli_printf("  Power setpoint: %ld W\r\n", (long)g_latest.p_set);
 
   usbcli_printf("Telemetry and link status:\r\n");
   usbcli_printf("  USB telemetry sequence number: %lu\r\n", (unsigned long)telemetry_seq);
   usbcli_printf("  ADC trigger frequency estimate: %lu Hz\r\n", (unsigned long)adc_seq_hz);
   usbcli_printf("  CAN bus activity up: %u\r\n", can_bus_up ? 1u : 0u);
+  usbcli_printf("  Freshness CAN/UART-power/UART-energy: %u/%u/%u\r\n",
+                control_status.can_fresh ? 1u : 0u,
+                control_status.uart_power_fresh ? 1u : 0u,
+                control_status.uart_energy_fresh ? 1u : 0u);
   if (can_command_valid)
   {
     usbcli_printf("  CAN command timestamp: %lu ms\r\n", (unsigned long)can_command.can_cmd_timestamp);
@@ -544,9 +557,36 @@ static void usbcli_cmd_pset(int argc, char **argv)
 
 static void usbcli_cmd_ctrl(int argc, char **argv)
 {
-  (void)argc;
-  (void)argv;
-  usbcli_printf("unavailable: main mode control is staged off\r\n");
+  if (argc < 2)
+  {
+    usbcli_printf("usage: ctrl <external|manual|measure|direct>\r\n");
+    return;
+  }
+
+  control_mode_request_t mode;
+  if (usbcli_streq(argv[1], "external"))
+  {
+    mode = CONTROL_MODE_EXTERNAL_SET;
+  }
+  else if (usbcli_streq(argv[1], "manual"))
+  {
+    mode = CONTROL_MODE_MANUAL_SET;
+  }
+  else if (usbcli_streq(argv[1], "measure"))
+  {
+    mode = CONTROL_MODE_MEASURE;
+  }
+  else if (usbcli_streq(argv[1], "direct"))
+  {
+    mode = CONTROL_MODE_DIRECT_GPIO;
+  }
+  else
+  {
+    usbcli_printf("usage: ctrl <external|manual|measure|direct>\r\n");
+    return;
+  }
+  ScapIo_SetModeRequest(mode);
+  usbcli_printf("ok\r\n");
 }
 
 static void usbcli_cmd_swen(int argc, char **argv)
@@ -606,9 +646,11 @@ static void usbcli_cmd_gpio(int argc, char **argv)
       return;
     }
 
-    if ((port == GPIOB) && ((pin & (GPIO_DIR_Pin | GPIO_SWEN_Pin | GPIO_MODEMSB_Pin | GPIO_MODELSB_Pin)) != 0u))
+    const bool stage_pin = ((port == GPIOB) && ((pin & (GPIO_DIR_Pin | GPIO_SWEN_Pin | GPIO_MODEMSB_Pin | GPIO_MODELSB_Pin)) != 0u)) ||
+                           ((port == GPIOA) && ((pin & GPIO_LED_Pin) != 0u));
+    if (stage_pin && !ScapIo_IsDirectMode())
     {
-      usbcli_printf("err: PB1/PB4/PB5/PB6 are protected by staging control\r\n");
+      usbcli_printf("err: power-stage GPIO writes require ctrl direct\r\n");
       return;
     }
 
@@ -624,9 +666,11 @@ static void usbcli_cmd_gpio(int argc, char **argv)
       usbcli_printf("usage: gpio toggle <PA10|...>\r\n");
       return;
     }
-    if ((port == GPIOB) && ((pin & (GPIO_DIR_Pin | GPIO_SWEN_Pin | GPIO_MODEMSB_Pin | GPIO_MODELSB_Pin)) != 0u))
+    const bool stage_pin = ((port == GPIOB) && ((pin & (GPIO_DIR_Pin | GPIO_SWEN_Pin | GPIO_MODEMSB_Pin | GPIO_MODELSB_Pin)) != 0u)) ||
+                           ((port == GPIOA) && ((pin & GPIO_LED_Pin) != 0u));
+    if (stage_pin && !ScapIo_IsDirectMode())
     {
-      usbcli_printf("err: PB1/PB4/PB5/PB6 are protected by staging control\r\n");
+      usbcli_printf("err: power-stage GPIO writes require ctrl direct\r\n");
       return;
     }
     HAL_GPIO_TogglePin(port, pin);
@@ -685,9 +729,9 @@ static void usbcli_cmd_dac(int argc, char **argv)
     return;
   }
 
-  if (dac_n == 1U)
+  if ((dac_n == 1U) && !ScapIo_IsDirectMode())
   {
-    usbcli_printf("err: DAC1 is protected by staging control\r\n");
+    usbcli_printf("err: DAC1 writes require ctrl direct\r\n");
     return;
   }
 
