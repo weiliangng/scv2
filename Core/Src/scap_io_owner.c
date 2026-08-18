@@ -2,16 +2,10 @@
 
 #include "main.h"
 
+#include "app_constants.h"
 #include "can_protocol.h"
 #include "command_inputs.h"
 #include "shared_state.h"
-
-#define CAN_FRESH_TIMEOUT_MS 100u
-#define UART_FRESH_TIMEOUT_MS 300u
-#define FAULT_RECOVERY_HEALTHY_MS 500u
-#define MANUAL_DEFAULT_POWER_W 50.0f
-#define UVLO_ENTER_V 10.0f
-#define UVLO_EXIT_V 11.0f
 
 static control_fast_command_t s_fast_commands[2];
 static volatile uint8_t s_fast_command_index;
@@ -139,12 +133,12 @@ bool ScapIo_FastUpdateUvlo(float v_bus)
 {
   if (s_uvlo_lockout != 0u)
   {
-    if (v_bus >= UVLO_EXIT_V)
+    if (v_bus >= SCAP_UVLO_EXIT_V)
     {
       s_uvlo_lockout = 0u;
     }
   }
-  else if (v_bus <= UVLO_ENTER_V)
+  else if (v_bus <= SCAP_UVLO_ENTER_V)
   {
     s_uvlo_lockout = 1u;
   }
@@ -213,13 +207,13 @@ void ScapIo_Resolve1kHz(void)
 
   const bool can_fresh = CommandInputs_IsFresh(can_command.can_cmd_timestamp != 0u ? can_command.can_cmd_timestamp : 0u,
                                                 can_command.can_cmd_timestamp != 0u,
-                                                now_ms, CAN_FRESH_TIMEOUT_MS);
+                                                now_ms, SCAP_CAN_FRESH_TIMEOUT_MS);
   const bool uart_power_fresh = CommandInputs_IsFresh(uart_command.power_w.timestamp_ms,
                                                        uart_command.power_w.present,
-                                                       now_ms, UART_FRESH_TIMEOUT_MS);
+                                                       now_ms, SCAP_UART_FRESH_TIMEOUT_MS);
   const bool uart_energy_fresh = CommandInputs_IsFresh(uart_command.energy_j.timestamp_ms,
                                                         uart_command.energy_j.present,
-                                                        now_ms, UART_FRESH_TIMEOUT_MS);
+                                                        now_ms, SCAP_UART_FRESH_TIMEOUT_MS);
   const bool fault_latched = ScapIo_IsFaultLatched();
   const bool uvlo_lockout = ScapIo_IsUvloLockout();
   static uint16_t healthy_ms;
@@ -228,7 +222,7 @@ void ScapIo_Resolve1kHz(void)
   {
     if (g_is_safe)
     {
-      if (healthy_ms < FAULT_RECOVERY_HEALTHY_MS)
+      if (healthy_ms < SCAP_FAULT_RECOVERY_MS)
       {
         healthy_ms++;
       }
@@ -237,7 +231,7 @@ void ScapIo_Resolve1kHz(void)
     {
       healthy_ms = 0u;
     }
-    if (healthy_ms >= FAULT_RECOVERY_HEALTHY_MS)
+    if (healthy_ms >= SCAP_FAULT_RECOVERY_MS)
     {
       s_fault_clear_request = 1u;
     }
@@ -261,7 +255,7 @@ void ScapIo_Resolve1kHz(void)
       break;
     case CONTROL_MODE_MANUAL_SET:
       command.decision = CONTROL_DECISION_MANUAL_SET_ALGO;
-      command.p_set_w = manual_command.power_w.present ? (float)manual_command.power_w.value : MANUAL_DEFAULT_POWER_W;
+      command.p_set_w = manual_command.power_w.present ? (float)manual_command.power_w.value : SCAP_MANUAL_DEFAULT_POWER_W;
       if (pushbutton_command.swen.present &&
           (!manual_command.swen.present ||
            ((uint32_t)(pushbutton_command.swen.timestamp_ms - manual_command.swen.timestamp_ms) < 0x80000000u)))

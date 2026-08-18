@@ -79,9 +79,8 @@ static inline uint16_t clamp_u12(int32_t v)
  *
  * NOTE: These timings assume a fixed CPU clock. If you change clocks, update CPU_HZ.
  */
-#define CPU_HZ (96000000u)
-#define SWEN_MIN_ON_CYC (CPU_HZ / 10u)    /* 100 ms */
-#define SWEN_MIN_OFF_CYC (CPU_HZ / 500u)  /* 2 ms */
+#define SWEN_MIN_ON_CYC ((SCAP_CPU_HZ * SCAP_SWEN_MIN_ON_MS) / 1000u)
+#define SWEN_MIN_OFF_CYC ((SCAP_CPU_HZ * SCAP_SWEN_MIN_OFF_MS) / 1000u)
 
 static inline uint8_t SwenMinOnOff(uint8_t req_on)
 {
@@ -121,11 +120,11 @@ static uint8_t g_swen_last_applied = 0xFFu; /* force first apply */
 static uint8_t ScapSafety_FaultBits(float v_bus, float v_cap)
 {
   uint8_t faults = 0u;
-  if (v_bus >= 30.0f)
+  if (v_bus >= SCAP_VBUS_OVP_V)
   {
     faults |= CONTROL_FAULT_VBUS_OVP;
   }
-  if (v_cap >= 30.0f)
+  if (v_cap >= SCAP_VCAP_OVP_V)
   {
     faults |= CONTROL_FAULT_VCAP_OVP;
   }
@@ -145,30 +144,30 @@ static uint8_t energy_allows_swen(const control_fast_command_t *command, float v
 
   if (s_charge_vcap_lockout != 0u)
   {
-    if (v_cap <= 25.3f)
+    if (v_cap <= SCAP_CHARGE_LOCKOUT_RESUME_V)
     {
       s_charge_vcap_lockout = 0u;
     }
   }
-  else if (v_cap >= 26.3f)
+  else if (v_cap >= SCAP_VCAP_MAX_V)
   {
     s_charge_vcap_lockout = 1u;
   }
 
   if (s_discharge_vcap_lockout != 0u)
   {
-    if (v_cap >= 6.26f)
+    if (v_cap >= SCAP_DISCHARGE_LOCKOUT_RESUME_V)
     {
       s_discharge_vcap_lockout = 0u;
     }
   }
-  else if (v_cap <= 5.26f)
+  else if (v_cap <= SCAP_VCAP_LOW_V)
   {
     s_discharge_vcap_lockout = 1u;
   }
 
-  return (uint8_t)(((s_charge_vcap_lockout == 0u) && (command->energy_j > 55u) && (i_conv > 0.0f)) ||
-                   ((s_discharge_vcap_lockout == 0u) && (command->energy_j < 20u) && (i_conv < 0.0f)));
+  return (uint8_t)(((s_charge_vcap_lockout == 0u) && (command->energy_j > SCAP_ENERGY_CHARGE_J) && (i_conv > 0.0f)) ||
+                   ((s_discharge_vcap_lockout == 0u) && (command->energy_j < SCAP_ENERGY_DISCHARGE_J) && (i_conv < 0.0f)));
 }
 
 /* USER CODE END 0 */

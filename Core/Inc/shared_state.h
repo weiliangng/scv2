@@ -32,7 +32,6 @@ extern volatile latest_values_t g_latest;
  */
 extern const float C_cap;
 extern const float V_cap_max;
-extern const float cap_hi;
 extern const float cap_lo;
 
 /*
