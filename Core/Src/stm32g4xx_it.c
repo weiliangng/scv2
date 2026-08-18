@@ -131,45 +131,6 @@ static uint8_t ScapSafety_FaultBits(float v_bus, float v_cap)
   return faults;
 }
 
-static uint8_t energy_allows_swen(const control_fast_command_t *command, float v_cap, float i_conv)
-{
-  static uint8_t s_charge_vcap_lockout;
-  static uint8_t s_discharge_vcap_lockout;
-
-  if (!command->energy_valid)
-  {
-    /* CAN's disabled-energy sentinel removes the buffer-energy gate. */
-    return 1u;
-  }
-
-  if (s_charge_vcap_lockout != 0u)
-  {
-    if (v_cap <= SCAP_CHARGE_LOCKOUT_RESUME_V)
-    {
-      s_charge_vcap_lockout = 0u;
-    }
-  }
-  else if (v_cap >= SCAP_VCAP_MAX_V)
-  {
-    s_charge_vcap_lockout = 1u;
-  }
-
-  if (s_discharge_vcap_lockout != 0u)
-  {
-    if (v_cap >= SCAP_DISCHARGE_LOCKOUT_RESUME_V)
-    {
-      s_discharge_vcap_lockout = 0u;
-    }
-  }
-  else if (v_cap <= SCAP_VCAP_LOW_V)
-  {
-    s_discharge_vcap_lockout = 1u;
-  }
-
-  return (uint8_t)(((s_charge_vcap_lockout == 0u) && (command->energy_j > SCAP_ENERGY_CHARGE_J) && (i_conv > 0.0f)) ||
-                   ((s_discharge_vcap_lockout == 0u) && (command->energy_j < SCAP_ENERGY_DISCHARGE_J) && (i_conv < 0.0f)));
-}
-
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -431,7 +392,7 @@ void DMA1_Channel1_IRQHandler(void)
         }
         else
         {
-          desired_swen = (command.swen_request && energy_allows_swen(&command, v_cap, i_conv)) ? 1u : 0u;
+          desired_swen = (command.swen_request && command.energy_swen_allowed) ? 1u : 0u;
         }
         desired_swen = SwenMinOnOff(desired_swen);
         led_desired = desired_swen != 0u ? GPIO_LED_Pin : 0u;

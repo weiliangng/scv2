@@ -41,6 +41,7 @@ void ScapIo_Init(void)
       .energy_j = 0u,
       .energy_valid = false,
       .swen_request = false,
+      .energy_swen_allowed = false,
   };
   s_fast_commands[0] = disabled;
   s_fast_commands[1] = disabled;
@@ -201,6 +202,7 @@ void ScapIo_Resolve1kHz(void)
       .energy_j = 0u,
       .energy_valid = false,
       .swen_request = false,
+      .energy_swen_allowed = false,
   };
   const uint32_t now_ms = HAL_GetTick();
   const control_mode_request_t mode = s_mode_request;
@@ -222,6 +224,8 @@ void ScapIo_Resolve1kHz(void)
   const bool fault_latched = ScapIo_IsFaultLatched();
   const bool uvlo_lockout = ScapIo_IsUvloLockout();
   static uint16_t healthy_ms;
+  static uint8_t charge_vcap_lockout;
+  static uint8_t discharge_vcap_lockout;
 
   if (fault_latched)
   {
@@ -295,6 +299,49 @@ void ScapIo_Resolve1kHz(void)
         command.decision = CONTROL_DECISION_NO_SOURCE;
       }
       break;
+    }
+  }
+
+  if (((command.decision == CONTROL_DECISION_CAN_ALGO) ||
+       (command.decision == CONTROL_DECISION_UART_ALGO)) && command.swen_request)
+  {
+    if (!command.energy_valid)
+    {
+      /* CAN's disabled-energy sentinel removes the buffer-energy gate. */
+      command.energy_swen_allowed = true;
+    }
+    else
+    {
+      const float v_cap = g_latest.v_cap;
+      const float i_conv = g_latest.i_conv;
+
+      if (charge_vcap_lockout != 0u)
+      {
+        if (v_cap <= SCAP_CHARGE_LOCKOUT_RESUME_V)
+        {
+          charge_vcap_lockout = 0u;
+        }
+      }
+      else if (v_cap >= SCAP_VCAP_MAX_V)
+      {
+        charge_vcap_lockout = 1u;
+      }
+
+      if (discharge_vcap_lockout != 0u)
+      {
+        if (v_cap >= SCAP_DISCHARGE_LOCKOUT_RESUME_V)
+        {
+          discharge_vcap_lockout = 0u;
+        }
+      }
+      else if (v_cap <= SCAP_VCAP_LOW_V)
+      {
+        discharge_vcap_lockout = 1u;
+      }
+
+      command.energy_swen_allowed =
+          ((charge_vcap_lockout == 0u) && (command.energy_j > SCAP_ENERGY_CHARGE_J) && (i_conv > 0.0f)) ||
+          ((discharge_vcap_lockout == 0u) && (command.energy_j < SCAP_ENERGY_DISCHARGE_J) && (i_conv < 0.0f));
     }
   }
 

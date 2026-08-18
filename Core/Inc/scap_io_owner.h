@@ -56,6 +56,7 @@ typedef struct
   uint16_t energy_j;
   bool energy_valid;
   bool swen_request;
+  bool energy_swen_allowed;
 } control_fast_command_t;
 
 void ScapIo_Init(void);
