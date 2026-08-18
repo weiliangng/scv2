@@ -1,0 +1,499 @@
+#!/usr/bin/env python3
+"""Live, read-only visualizer for the SCV2 T1 USB telemetry stream.
+
+The authoritative CSV field contract is ``agent.md`` in the repository root.
+This program deliberately accepts only that fixed T1 schema.
+"""
+
+from __future__ import annotations
+
+import argparse
+import math
+import queue
+import sys
+import threading
+import time
+from collections import deque
+from dataclasses import dataclass
+from typing import Callable
+
+import pyqtgraph as pg
+import serial
+from PySide6 import QtCore, QtGui, QtWidgets
+from serial.tools import list_ports
+
+
+@dataclass(frozen=True)
+class Field:
+    name: str
+    label: str
+    unit: str = ""
+
+
+# Positional order from agent.md. Keep this list in lockstep with T1.
+FIELDS = (
+    Field("seq", "Sequence"), Field("adc_hz", "ADC rate", "Hz"),
+    Field("usb_drop", "USB drops"), Field("dma_last", "DMA last", "cycles"),
+    Field("dma_max", "DMA max", "cycles"), Field("adc_vcap", "ADC Vcap"),
+    Field("adc_vbus", "ADC Vbus"), Field("adc_iload", "ADC Iload"),
+    Field("adc_iop", "ADC IMONOP"), Field("adc_ion", "ADC IMONON"),
+    Field("vc_mV", "Vcap", "mV"), Field("vb_mV", "Vbus", "mV"),
+    Field("il_mA", "Iload", "mA"), Field("iop_mA", "IMONOP", "mA"),
+    Field("ion_mA", "IMONON", "mA"), Field("io_mA", "Iout", "mA"),
+    Field("ic_mA", "Iconv", "mA"), Field("pset_W", "Power setpoint", "W"),
+    Field("btn_in", "Button input"), Field("dir_out", "Direction"),
+    Field("swen_out", "Switch enable"), Field("mode_out", "Mode pins"),
+    Field("rvsoff_out", "RVSOFF"), Field("nsil_out", "NSIL"), Field("led_out", "Status LED"),
+    Field("dac1_ch1", "DAC1 CH1"), Field("dac1_ch2", "DAC1 CH2"),
+    Field("dac3_ch1", "DAC3 CH1"), Field("dac3_ch2", "DAC3 CH2"),
+    Field("mode_req", "Requested mode"), Field("decision", "Control decision"),
+    Field("swen_req", "SWEN request"), Field("safe", "Safety"), Field("uvlo", "UVLO"),
+    Field("fault_latched", "Fault latch"), Field("fault_bits", "Fault bits"),
+    Field("fault_healthy_ms", "Fault recovery", "ms"), Field("can_bus", "CAN bus"),
+    Field("can_p", "CAN power", "W"), Field("can_p_valid", "CAN power valid"),
+    Field("can_p_fresh", "CAN power fresh"), Field("can_e", "CAN energy", "J"),
+    Field("can_e_valid", "CAN energy valid"), Field("can_e_fresh", "CAN energy fresh"),
+    Field("can_e_disabled", "CAN energy disabled"), Field("can_swen", "CAN SWEN"),
+    Field("can_swen_valid", "CAN SWEN valid"), Field("can_swen_fresh", "CAN SWEN fresh"),
+    Field("uart_p", "UART power", "W"), Field("uart_p_valid", "UART power valid"),
+    Field("uart_p_fresh", "UART power fresh"), Field("uart_e", "UART energy", "J"),
+    Field("uart_e_valid", "UART energy valid"), Field("uart_e_fresh", "UART energy fresh"),
+    Field("uart_swen_req", "UART SWEN request"), Field("man_p", "Manual power", "W"),
+    Field("man_p_valid", "Manual power valid"), Field("man_swen", "Manual SWEN"),
+    Field("man_swen_valid", "Manual SWEN valid"), Field("btn_swen", "Button SWEN"),
+    Field("btn_swen_valid", "Button SWEN valid"),
+)
+FIELD_BY_NAME = {field.name: field for field in FIELDS}
+
+CONTINUOUS = {
+    "seq", "adc_hz", "usb_drop", "dma_last", "dma_max", "adc_vcap", "adc_vbus",
+    "adc_iload", "adc_iop", "adc_ion", "vc_mV", "vb_mV", "il_mA", "iop_mA",
+    "ion_mA", "io_mA", "ic_mA", "pset_W", "dac1_ch1", "dac1_ch2", "dac3_ch1",
+    "dac3_ch2", "fault_healthy_ms", "can_p", "can_e", "uart_p", "uart_e", "man_p",
+}
+VALIDITY_FIELD = {
+    "can_p": "can_p_valid", "can_e": "can_e_valid", "uart_p": "uart_p_valid",
+    "uart_e": "uart_e_valid", "man_p": "man_p_valid",
+}
+
+TEXT = {
+    "btn_in": ("LOW", "HIGH"), "dir_out": ("NEGATIVE", "POSITIVE"),
+    "swen_out": ("OFF", "ON"), "rvsoff_out": ("OFF", "ON"),
+    "nsil_out": ("OFF", "ON"), "led_out": ("OFF", "ON"),
+    "swen_req": ("OFF", "ON"), "can_swen": ("OFF", "ON"),
+    "uart_swen_req": ("OFF", "ON"), "man_swen": ("OFF", "ON"),
+    "btn_swen": ("OFF", "ON"), "safe": ("UNSAFE", "SAFE"),
+    "uvlo": ("CLEAR", "LOCKOUT"), "fault_latched": ("CLEAR", "LATCHED"),
+    "can_bus": ("DOWN", "UP"),
+}
+for _name in ("can_p_valid", "can_e_valid", "can_swen_valid", "uart_p_valid", "uart_e_valid",
+              "man_p_valid", "man_swen_valid", "btn_swen_valid"):
+    TEXT[_name] = ("INVALID", "VALID")
+for _name in ("can_p_fresh", "can_e_fresh", "can_swen_fresh", "uart_p_fresh", "uart_e_fresh"):
+    TEXT[_name] = ("STALE", "FRESH")
+
+MODE_REQUEST = ("EXTERNAL", "MANUAL", "MEASURE", "DIRECT GPIO")
+DECISION = ("FAULT DISABLE", "IDLE / UVLO", "NO SOURCE", "MANUAL", "CAN", "UART", "MEASURE", "DIRECT GPIO")
+MODE_OUT = ("BITS 00", "ALGORITHM", "BITS 10", "BITS 11")
+
+COLORS = ("#4ea7f5", "#f6c85f", "#6fca8d", "#ef7c8e", "#bd8bff", "#62d9d3", "#f59f5a", "#d9e3f0")
+HISTORY_SAMPLES = 6000  # one minute at 100 Hz
+
+
+def parse_t1(line: str) -> dict[str, int] | None:
+    """Parse one complete T1 CSV line; unrelated CLI output is ignored."""
+    parts = line.strip().split(",")
+    if not parts or parts[0] != "T1":
+        return None
+    if len(parts) != len(FIELDS) + 1:
+        raise ValueError(f"T1 has {len(parts) - 1} values; expected {len(FIELDS)}")
+    try:
+        return {field.name: int(value, 10) for field, value in zip(FIELDS, parts[1:], strict=True)}
+    except ValueError as exc:
+        raise ValueError("T1 contains a non-integer value") from exc
+
+
+def demo_sample(sequence: int) -> dict[str, int]:
+    """A valid changing frame for offline UI checks and presentation."""
+    t = sequence / 20.0
+    sample = {field.name: 0 for field in FIELDS}
+    sample.update({
+        "seq": sequence, "adc_hz": 100_000, "dma_last": 920 + int(90 * math.sin(t)), "dma_max": 1120,
+        "adc_vcap": 2500, "adc_vbus": 2900, "adc_iload": 2050, "adc_iop": 2100, "adc_ion": 2020,
+        "vc_mV": 18500 + int(1200 * math.sin(t / 3)), "vb_mV": 24000 + int(400 * math.sin(t / 4)),
+        "il_mA": int(2500 * math.sin(t)), "iop_mA": int(2300 * math.sin(t)),
+        "ion_mA": int(-1900 * math.sin(t)), "io_mA": int(2200 * math.sin(t)),
+        "ic_mA": int(2800 * math.sin(t / 2)), "pset_W": 80, "dir_out": 1, "swen_out": 1,
+        "mode_out": 1, "led_out": 1, "dac1_ch1": 2200, "dac1_ch2": 1800, "dac3_ch1": 2048,
+        "dac3_ch2": 2048, "mode_req": 0, "decision": 4, "swen_req": 1, "safe": 1,
+        "fault_bits": 0, "can_bus": 1, "can_p": 80, "can_p_valid": 1, "can_p_fresh": 1,
+        "can_e": 40, "can_e_valid": 1, "can_e_fresh": 1, "can_swen": 1, "can_swen_valid": 1,
+        "can_swen_fresh": 1,
+    })
+    return sample
+
+
+class SerialReader(threading.Thread):
+    def __init__(self, port: str, baud: int, enable_telemetry: bool, events: queue.Queue) -> None:
+        super().__init__(name="scv2-serial-reader", daemon=True)
+        self.port, self.baud, self.enable_telemetry, self.events = port, baud, enable_telemetry, events
+        self.stop_requested = threading.Event()
+        self._serial: serial.Serial | None = None
+        self._started_telemetry = False
+
+    def stop(self) -> None:
+        self.stop_requested.set()
+
+    def run(self) -> None:
+        try:
+            self._serial = serial.Serial(self.port, self.baud, timeout=0.2, write_timeout=0.5)
+            if self.enable_telemetry:
+                self._serial.write(b"telemetry on\r\n")
+                self._serial.flush()
+                self._started_telemetry = True
+            self.events.put(("connected", self.port))
+            while not self.stop_requested.is_set():
+                raw = self._serial.readline()
+                if not raw:
+                    continue
+                try:
+                    sample = parse_t1(raw.decode("ascii", errors="replace"))
+                    if sample is not None:
+                        self.events.put(("sample", sample))
+                except ValueError as exc:
+                    self.events.put(("parse_error", str(exc)))
+        except (OSError, serial.SerialException) as exc:
+            self.events.put(("error", str(exc)))
+        finally:
+            if self._serial is not None:
+                try:
+                    if self._started_telemetry:
+                        self._serial.write(b"telemetry off\r\n")
+                        self._serial.flush()
+                    self._serial.close()
+                except (OSError, serial.SerialException):
+                    pass
+            self.events.put(("disconnected", self.port))
+
+
+class StatusCard(QtWidgets.QFrame):
+    def __init__(self, title: str) -> None:
+        super().__init__()
+        self.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        self.title = QtWidgets.QLabel(title)
+        self.value = QtWidgets.QLabel("—")
+        self.value.setWordWrap(True)
+        self.title.setStyleSheet("font-size: 10px; color: #cbd5e1;")
+        self.value.setStyleSheet("font-weight: 700; font-size: 14px;")
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(2)
+        layout.addWidget(self.title)
+        layout.addWidget(self.value)
+        self.set_state("—", "grey")
+
+    def set_state(self, text: str, state: str) -> None:
+        backgrounds = {"grey": "#444b55", "green": "#176b48", "red": "#8d2631", "amber": "#8a5a10", "blue": "#1c5683"}
+        self.value.setText(text)
+        self.setStyleSheet(f"StatusCard {{ background: {backgrounds[state]}; border: 1px solid #718096; border-radius: 5px; }}")
+
+
+class PlotPanel(QtWidgets.QWidget):
+    def __init__(self, title: str, fields: list[str], history: dict[str, deque[float]], times: deque[float]) -> None:
+        super().__init__()
+        self.fields, self.history, self.times = fields, history, times
+        self.plot = pg.PlotWidget(title=title)
+        self.plot.showGrid(x=True, y=True, alpha=0.25)
+        self.plot.addLegend(offset=(8, 8))
+        self.plot.getAxis("bottom").setLabel("seconds ago")
+        self.curves = {
+            name: self.plot.plot(name=FIELD_BY_NAME[name].label, pen=pg.mkPen(COLORS[index % len(COLORS)], width=1.6))
+            for index, name in enumerate(fields)
+        }
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.plot)
+
+    def refresh(self) -> None:
+        if not self.times:
+            return
+        now = self.times[-1]
+        x = [t - now for t in self.times]
+        for name, curve in self.curves.items():
+            curve.setData(x, list(self.history[name]))
+
+
+class Dashboard(QtWidgets.QMainWindow):
+    def __init__(self, args: argparse.Namespace) -> None:
+        super().__init__()
+        self.args = args
+        self.events: queue.Queue = queue.Queue(maxsize=2000)
+        self.reader: SerialReader | None = None
+        self.demo_sequence = 0
+        self.last_sample: dict[str, int] | None = None
+        self.last_seq: int | None = None
+        self.frame_gaps = 0
+        self.times: deque[float] = deque(maxlen=HISTORY_SAMPLES)
+        self.history = {name: deque(maxlen=HISTORY_SAMPLES) for name in CONTINUOUS}
+        self.status_cards: dict[str, StatusCard] = {}
+        self.numeric_cards: dict[str, StatusCard] = {}
+        self.plot_panels: list[PlotPanel] = []
+
+        self.setWindowTitle("SCV2 Telemetry Dashboard")
+        self.resize(1500, 950)
+        self._build_ui()
+        self.refresh_ports()
+
+        self.poll_timer = QtCore.QTimer(self)
+        self.poll_timer.timeout.connect(self.poll_events)
+        self.poll_timer.start(50)
+        self.demo_timer = QtCore.QTimer(self)
+        self.demo_timer.timeout.connect(self.add_demo_sample)
+        if args.demo:
+            self.demo_timer.start(20)
+            self.connection.setText("DEMO — simulated T1 telemetry")
+        if args.exit_after:
+            QtCore.QTimer.singleShot(int(args.exit_after * 1000), self.close)
+
+    def _build_ui(self) -> None:
+        pg.setConfigOptions(antialias=True, background="#18212b", foreground="#d9e3f0")
+        root = QtWidgets.QWidget()
+        self.setCentralWidget(root)
+        root_layout = QtWidgets.QVBoxLayout(root)
+        root_layout.setContentsMargins(8, 8, 8, 8)
+
+        controls = QtWidgets.QHBoxLayout()
+        self.port_combo = QtWidgets.QComboBox()
+        self.port_combo.setMinimumWidth(180)
+        self.baud = QtWidgets.QSpinBox()
+        self.baud.setRange(1200, 2_000_000)
+        self.baud.setValue(self.args.baud)
+        self.refresh_button = QtWidgets.QPushButton("Refresh ports")
+        self.refresh_button.clicked.connect(self.refresh_ports)
+        self.connect_button = QtWidgets.QPushButton("Connect")
+        self.connect_button.clicked.connect(self.toggle_connection)
+        self.auto_telemetry = QtWidgets.QCheckBox("Enable telemetry while connected")
+        self.auto_telemetry.setChecked(True)
+        self.connection = QtWidgets.QLabel("Disconnected")
+        self.connection.setStyleSheet("font-weight: 700;")
+        controls.addWidget(QtWidgets.QLabel("Port"))
+        controls.addWidget(self.port_combo)
+        controls.addWidget(QtWidgets.QLabel("Baud"))
+        controls.addWidget(self.baud)
+        controls.addWidget(self.refresh_button)
+        controls.addWidget(self.connect_button)
+        controls.addWidget(self.auto_telemetry)
+        controls.addStretch(1)
+        controls.addWidget(self.connection)
+        root_layout.addLayout(controls)
+
+        self.tabs = QtWidgets.QTabWidget()
+        self.tabs.addTab(self._overview_page(), "Overview")
+        self.tabs.addTab(self._signals_page(), "All continuous signals")
+        root_layout.addWidget(self.tabs)
+
+    def _card_grid(self, title: str, names: list[str], columns: int = 4) -> QtWidgets.QGroupBox:
+        box = QtWidgets.QGroupBox(title)
+        grid = QtWidgets.QGridLayout(box)
+        grid.setSpacing(6)
+        for index, name in enumerate(names):
+            card = StatusCard(FIELD_BY_NAME[name].label)
+            self.status_cards[name] = card
+            grid.addWidget(card, index // columns, index % columns)
+        return box
+
+    def _overview_page(self) -> QtWidgets.QWidget:
+        page = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(page)
+        values = QtWidgets.QGridLayout()
+        for index, name in enumerate(("vb_mV", "vc_mV", "il_mA", "io_mA", "ic_mA", "pset_W", "adc_hz", "usb_drop")):
+            card = StatusCard(FIELD_BY_NAME[name].label)
+            self.numeric_cards[name] = card
+            values.addWidget(card, 0, index)
+        layout.addLayout(values)
+
+        plots = QtWidgets.QGridLayout()
+        self._add_plot(plots, 0, 0, "Voltages", ["vb_mV", "vc_mV"])
+        self._add_plot(plots, 0, 1, "Currents", ["il_mA", "iop_mA", "ion_mA", "io_mA", "ic_mA"])
+        self._add_plot(plots, 1, 0, "Power and energy", ["pset_W", "can_p", "uart_p", "man_p", "can_e", "uart_e"])
+        self._add_plot(plots, 1, 1, "Telemetry timing", ["adc_hz", "usb_drop", "dma_last", "dma_max", "fault_healthy_ms"])
+        layout.addLayout(plots, 2)
+
+        states = QtWidgets.QGridLayout()
+        states.addWidget(self._card_grid("Physical I/O", ["btn_in", "dir_out", "swen_out", "mode_out", "rvsoff_out", "nsil_out", "led_out"]), 0, 0)
+        states.addWidget(self._card_grid("Control and safety", ["mode_req", "decision", "swen_req", "safe", "uvlo", "fault_latched", "fault_bits"]), 0, 1)
+        states.addWidget(self._card_grid("CAN", ["can_bus", "can_p_valid", "can_p_fresh", "can_e_valid", "can_e_fresh", "can_e_disabled", "can_swen", "can_swen_valid", "can_swen_fresh"]), 1, 0)
+        states.addWidget(self._card_grid("UART and manual", ["uart_p_valid", "uart_p_fresh", "uart_e_valid", "uart_e_fresh", "uart_swen_req", "man_p_valid", "man_swen", "man_swen_valid", "btn_swen", "btn_swen_valid"]), 1, 1)
+        layout.addLayout(states, 2)
+        return page
+
+    def _signals_page(self) -> QtWidgets.QWidget:
+        page = QtWidgets.QWidget()
+        grid = QtWidgets.QGridLayout(page)
+        self._add_plot(grid, 0, 0, "Raw ADC counts", ["adc_vcap", "adc_vbus", "adc_iload", "adc_iop", "adc_ion"])
+        self._add_plot(grid, 0, 1, "DAC counts", ["dac1_ch1", "dac1_ch2", "dac3_ch1", "dac3_ch2"])
+        self._add_plot(grid, 1, 0, "Current and voltage", ["vb_mV", "vc_mV", "il_mA", "iop_mA", "ion_mA", "io_mA", "ic_mA"])
+        self._add_plot(grid, 1, 1, "Sequence and diagnostics", ["seq", "adc_hz", "usb_drop", "dma_last", "dma_max", "fault_healthy_ms"])
+        self._add_plot(grid, 2, 0, "Command values", ["pset_W", "can_p", "can_e", "uart_p", "uart_e", "man_p"])
+        return page
+
+    def _add_plot(self, layout: QtWidgets.QGridLayout, row: int, column: int, title: str, names: list[str]) -> None:
+        panel = PlotPanel(title, names, self.history, self.times)
+        self.plot_panels.append(panel)
+        layout.addWidget(panel, row, column)
+
+    def refresh_ports(self) -> None:
+        selected = self.port_combo.currentText()
+        self.port_combo.clear()
+        ports = list(list_ports.comports())
+        self.port_combo.addItems([f"{port.device} — {port.description}" for port in ports])
+        if self.args.port and not ports:
+            self.port_combo.addItem(self.args.port)
+        for index in range(self.port_combo.count()):
+            if self.args.port and self.port_combo.itemText(index).startswith(self.args.port):
+                self.port_combo.setCurrentIndex(index)
+            elif selected and self.port_combo.itemText(index) == selected:
+                self.port_combo.setCurrentIndex(index)
+
+    def selected_port(self) -> str:
+        return self.port_combo.currentText().split(" — ", 1)[0].strip()
+
+    def toggle_connection(self) -> None:
+        if self.reader is not None:
+            self.reader.stop()
+            self.connect_button.setEnabled(False)
+            return
+        port = self.selected_port()
+        if not port:
+            QtWidgets.QMessageBox.warning(self, "No serial port", "Connect the SCV2 USB device, then click Refresh ports.")
+            return
+        self.reader = SerialReader(port, self.baud.value(), self.auto_telemetry.isChecked(), self.events)
+        self.reader.start()
+        self.connection.setText(f"Connecting to {port}…")
+        self.connect_button.setText("Disconnect")
+
+    def add_demo_sample(self) -> None:
+        self.demo_sequence += 1
+        self.consume_sample(demo_sample(self.demo_sequence))
+
+    def poll_events(self) -> None:
+        changed = False
+        while True:
+            try:
+                event, data = self.events.get_nowait()
+            except queue.Empty:
+                break
+            if event == "sample":
+                self.consume_sample(data)
+                changed = True
+            elif event == "connected":
+                self.connection.setText(f"Connected: {data}")
+            elif event == "error":
+                self.connection.setText(f"Error: {data}")
+            elif event == "parse_error":
+                self.connection.setText(f"Ignored malformed telemetry: {data}")
+            elif event == "disconnected":
+                self.reader = None
+                self.connect_button.setEnabled(True)
+                self.connect_button.setText("Connect")
+                if not self.args.demo:
+                    self.connection.setText("Disconnected")
+        if changed:
+            for panel in self.plot_panels:
+                panel.refresh()
+
+    def consume_sample(self, sample: dict[str, int]) -> None:
+        now = time.monotonic()
+        self.last_sample = sample
+        if self.last_seq is not None and sample["seq"] > self.last_seq + 1:
+            self.frame_gaps += sample["seq"] - self.last_seq - 1
+        self.last_seq = sample["seq"]
+        self.times.append(now)
+        for name, values in self.history.items():
+            value = float(sample[name])
+            valid_name = VALIDITY_FIELD.get(name)
+            values.append(value if valid_name is None or sample[valid_name] else math.nan)
+        for name, card in self.numeric_cards.items():
+            field = FIELD_BY_NAME[name]
+            suffix = f" {field.unit}" if field.unit else ""
+            card.set_state(f"{sample[name]:,}{suffix}", "blue")
+        for name, card in self.status_cards.items():
+            text, state = status_text_and_state(name, sample)
+            card.set_state(text, state)
+        self.connection.setText(f"Live — gaps: {self.frame_gaps}  |  T1 sequence: {sample['seq']}")
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # noqa: N802
+        if self.reader is not None:
+            self.reader.stop()
+            self.reader.join(timeout=1.0)
+        event.accept()
+
+
+def status_text_and_state(name: str, sample: dict[str, int]) -> tuple[str, str]:
+    value = sample[name]
+    if name in VALIDITY_FIELD:
+        valid = sample[VALIDITY_FIELD[name]]
+        field = FIELD_BY_NAME[name]
+        if name == "can_e" and sample["can_e_disabled"]:
+            return "DISABLED", "grey"
+        return (f"{value} {field.unit}" if valid else "INVALID"), ("blue" if valid else "grey")
+    if name == "mode_req":
+        return enum_text(MODE_REQUEST, value), "amber" if value == 3 else "blue"
+    if name == "decision":
+        if 0 <= value < len(DECISION):
+            color = "red" if value == 0 else "grey" if value in (1, 2) else "amber" if value == 7 else "green"
+            return DECISION[value], color
+        return f"UNKNOWN ({value})", "red"
+    if name == "mode_out":
+        return enum_text(MODE_OUT, value), "green" if value == 1 else "amber"
+    if name == "fault_bits":
+        labels = {0: "NO FAULT", 1: "VBUS OVP", 2: "VCAP OVP", 3: "VBUS + VCAP OVP"}
+        return labels.get(value, f"UNKNOWN (0x{value:X})"), "green" if value == 0 else "red"
+    if name in TEXT:
+        off, on = TEXT[name]
+        text = on if value else off
+        if name in {"safe"}:
+            return text, "green" if value else "red"
+        if name in {"uvlo", "fault_latched"}:
+            return text, "red" if value else "green"
+        if name.endswith("_valid") or name.endswith("_fresh"):
+            return text, "green" if value else "grey"
+        return text, "green" if value else "grey"
+    return str(value), "blue"
+
+
+def enum_text(values: tuple[str, ...], value: int) -> str:
+    return values[value] if 0 <= value < len(values) else f"UNKNOWN ({value})"
+
+
+def self_test() -> None:
+    values = demo_sample(42)
+    line = "T1," + ",".join(str(values[field.name]) for field in FIELDS)
+    parsed = parse_t1(line)
+    assert parsed == values
+    assert parse_t1("CLI ready") is None
+    assert status_text_and_state("decision", parsed) == ("CAN", "green")
+    assert status_text_and_state("can_p", {**parsed, "can_p_valid": 0}) == ("INVALID", "grey")
+    print("T1 parser and state-display self-test passed.")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--port", help="COM port to open, for example COM8")
+    parser.add_argument("--baud", type=int, default=115200)
+    parser.add_argument("--demo", action="store_true", help="Show simulated telemetry without hardware")
+    parser.add_argument("--exit-after", type=float, help="Close automatically after this many seconds (test helper)")
+    parser.add_argument("--self-test", action="store_true", help="Validate CSV parsing and display rules, then exit")
+    args = parser.parse_args()
+    if args.self_test:
+        self_test()
+        return 0
+    app = QtWidgets.QApplication(sys.argv)
+    app.setStyle("Fusion")
+    window = Dashboard(args)
+    window.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
