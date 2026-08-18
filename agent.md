@@ -84,7 +84,7 @@ In external mode, fresh UART power plus energy wins; otherwise fresh CAN is used
 
 `tools/scv2_dashboard.py` is the read-only local viewer for this exact `T1` schema. It consumes only complete records with all 61 columns and ignores ordinary CLI output. Its field order is intentionally tied to this document.
 
-- Continuous fields are rolling graphs. Invalid CAN, UART, and manual command values are omitted from plots rather than shown as zero.
+- Continuous fields are shown as live current-value cards; the dashboard does not retain or graph historical samples. Invalid CAN, UART, and manual command values are greyed out rather than shown as zero.
 - Validity and freshness fields are displayed as `VALID`/`INVALID` and `FRESH`/`STALE`; invalid or stale values are grey.
 - Binary fields are semantic state cards such as `ON`/`OFF`, `SAFE`/`UNSAFE`, and `UP`/`DOWN`.
 - N-ary resolver values are decoded: for example, `decision=5` is shown as `UART` and `decision=1` as `IDLE / UVLO`.

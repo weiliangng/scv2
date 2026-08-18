@@ -13,11 +13,8 @@ import queue
 import sys
 import threading
 import time
-from collections import deque
 from dataclasses import dataclass
-from typing import Callable
 
-import pyqtgraph as pg
 import serial
 from PySide6 import QtCore, QtGui, QtWidgets
 from serial.tools import list_ports
@@ -65,12 +62,6 @@ FIELDS = (
 )
 FIELD_BY_NAME = {field.name: field for field in FIELDS}
 
-CONTINUOUS = {
-    "seq", "adc_hz", "usb_drop", "dma_last", "dma_max", "adc_vcap", "adc_vbus",
-    "adc_iload", "adc_iop", "adc_ion", "vc_mV", "vb_mV", "il_mA", "iop_mA",
-    "ion_mA", "io_mA", "ic_mA", "pset_W", "dac1_ch1", "dac1_ch2", "dac3_ch1",
-    "dac3_ch2", "fault_healthy_ms", "can_p", "can_e", "uart_p", "uart_e", "man_p",
-}
 VALIDITY_FIELD = {
     "can_p": "can_p_valid", "can_e": "can_e_valid", "uart_p": "uart_p_valid",
     "uart_e": "uart_e_valid", "man_p": "man_p_valid",
@@ -95,10 +86,6 @@ for _name in ("can_p_fresh", "can_e_fresh", "can_swen_fresh", "uart_p_fresh", "u
 MODE_REQUEST = ("EXTERNAL", "MANUAL", "MEASURE", "DIRECT GPIO")
 DECISION = ("FAULT DISABLE", "IDLE / UVLO", "NO SOURCE", "MANUAL", "CAN", "UART", "MEASURE", "DIRECT GPIO")
 MODE_OUT = ("BITS 00", "ALGORITHM", "BITS 10", "BITS 11")
-
-COLORS = ("#4ea7f5", "#f6c85f", "#6fca8d", "#ef7c8e", "#bd8bff", "#62d9d3", "#f59f5a", "#d9e3f0")
-HISTORY_SAMPLES = 6000  # one minute at 100 Hz
-
 
 def parse_t1(line: str) -> dict[str, int] | None:
     """Parse one complete T1 CSV line; unrelated CLI output is ignored."""
@@ -198,31 +185,6 @@ class StatusCard(QtWidgets.QFrame):
         self.setStyleSheet(f"StatusCard {{ background: {backgrounds[state]}; border: 1px solid #718096; border-radius: 5px; }}")
 
 
-class PlotPanel(QtWidgets.QWidget):
-    def __init__(self, title: str, fields: list[str], history: dict[str, deque[float]], times: deque[float]) -> None:
-        super().__init__()
-        self.fields, self.history, self.times = fields, history, times
-        self.plot = pg.PlotWidget(title=title)
-        self.plot.showGrid(x=True, y=True, alpha=0.25)
-        self.plot.addLegend(offset=(8, 8))
-        self.plot.getAxis("bottom").setLabel("seconds ago")
-        self.curves = {
-            name: self.plot.plot(name=FIELD_BY_NAME[name].label, pen=pg.mkPen(COLORS[index % len(COLORS)], width=1.6))
-            for index, name in enumerate(fields)
-        }
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.plot)
-
-    def refresh(self) -> None:
-        if not self.times:
-            return
-        now = self.times[-1]
-        x = [t - now for t in self.times]
-        for name, curve in self.curves.items():
-            curve.setData(x, list(self.history[name]))
-
-
 class Dashboard(QtWidgets.QMainWindow):
     def __init__(self, args: argparse.Namespace) -> None:
         super().__init__()
@@ -233,11 +195,8 @@ class Dashboard(QtWidgets.QMainWindow):
         self.last_sample: dict[str, int] | None = None
         self.last_seq: int | None = None
         self.frame_gaps = 0
-        self.times: deque[float] = deque(maxlen=HISTORY_SAMPLES)
-        self.history = {name: deque(maxlen=HISTORY_SAMPLES) for name in CONTINUOUS}
         self.status_cards: dict[str, StatusCard] = {}
         self.numeric_cards: dict[str, StatusCard] = {}
-        self.plot_panels: list[PlotPanel] = []
 
         self.setWindowTitle("SCV2 Telemetry Dashboard")
         self.resize(1500, 950)
@@ -246,7 +205,7 @@ class Dashboard(QtWidgets.QMainWindow):
 
         self.poll_timer = QtCore.QTimer(self)
         self.poll_timer.timeout.connect(self.poll_events)
-        self.poll_timer.start(50)
+        self.poll_timer.start(30)
         self.demo_timer = QtCore.QTimer(self)
         self.demo_timer.timeout.connect(self.add_demo_sample)
         if args.demo:
@@ -256,7 +215,6 @@ class Dashboard(QtWidgets.QMainWindow):
             QtCore.QTimer.singleShot(int(args.exit_after * 1000), self.close)
 
     def _build_ui(self) -> None:
-        pg.setConfigOptions(antialias=True, background="#18212b", foreground="#d9e3f0")
         root = QtWidgets.QWidget()
         self.setCentralWidget(root)
         root_layout = QtWidgets.QVBoxLayout(root)
@@ -288,8 +246,8 @@ class Dashboard(QtWidgets.QMainWindow):
         root_layout.addLayout(controls)
 
         self.tabs = QtWidgets.QTabWidget()
-        self.tabs.addTab(self._overview_page(), "Overview")
-        self.tabs.addTab(self._signals_page(), "All continuous signals")
+        self.tabs.addTab(self._live_values_page(), "Live values")
+        self.tabs.addTab(self._status_page(), "Status")
         root_layout.addWidget(self.tabs)
 
     def _card_grid(self, title: str, names: list[str], columns: int = 4) -> QtWidgets.QGroupBox:
@@ -302,45 +260,34 @@ class Dashboard(QtWidgets.QMainWindow):
             grid.addWidget(card, index // columns, index % columns)
         return box
 
-    def _overview_page(self) -> QtWidgets.QWidget:
-        page = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(page)
-        values = QtWidgets.QGridLayout()
-        for index, name in enumerate(("vb_mV", "vc_mV", "il_mA", "io_mA", "ic_mA", "pset_W", "adc_hz", "usb_drop")):
+    def _value_grid(self, title: str, names: list[str], columns: int = 4) -> QtWidgets.QGroupBox:
+        box = QtWidgets.QGroupBox(title)
+        grid = QtWidgets.QGridLayout(box)
+        grid.setSpacing(6)
+        for index, name in enumerate(names):
             card = StatusCard(FIELD_BY_NAME[name].label)
             self.numeric_cards[name] = card
-            values.addWidget(card, 0, index)
-        layout.addLayout(values)
+            grid.addWidget(card, index // columns, index % columns)
+        return box
 
-        plots = QtWidgets.QGridLayout()
-        self._add_plot(plots, 0, 0, "Voltages", ["vb_mV", "vc_mV"])
-        self._add_plot(plots, 0, 1, "Currents", ["il_mA", "iop_mA", "ion_mA", "io_mA", "ic_mA"])
-        self._add_plot(plots, 1, 0, "Power and energy", ["pset_W", "can_p", "uart_p", "man_p", "can_e", "uart_e"])
-        self._add_plot(plots, 1, 1, "Telemetry timing", ["adc_hz", "usb_drop", "dma_last", "dma_max", "fault_healthy_ms"])
-        layout.addLayout(plots, 2)
+    def _live_values_page(self) -> QtWidgets.QWidget:
+        page = QtWidgets.QWidget()
+        layout = QtWidgets.QGridLayout(page)
+        layout.addWidget(self._value_grid("Calibrated electrical values", ["vb_mV", "vc_mV", "il_mA", "iop_mA", "ion_mA", "io_mA", "ic_mA", "pset_W"]), 0, 0)
+        layout.addWidget(self._value_grid("Raw ADC values", ["adc_vcap", "adc_vbus", "adc_iload", "adc_iop", "adc_ion"]), 0, 1)
+        layout.addWidget(self._value_grid("DAC values", ["dac1_ch1", "dac1_ch2", "dac3_ch1", "dac3_ch2"]), 1, 0)
+        layout.addWidget(self._value_grid("Command values", ["can_p", "can_e", "uart_p", "uart_e", "man_p"]), 1, 1)
+        layout.addWidget(self._value_grid("Telemetry and diagnostics", ["seq", "adc_hz", "usb_drop", "dma_last", "dma_max", "fault_healthy_ms"]), 2, 0, 1, 2)
+        return page
 
-        states = QtWidgets.QGridLayout()
+    def _status_page(self) -> QtWidgets.QWidget:
+        page = QtWidgets.QWidget()
+        states = QtWidgets.QGridLayout(page)
         states.addWidget(self._card_grid("Physical I/O", ["btn_in", "dir_out", "swen_out", "mode_out", "rvsoff_out", "nsil_out", "led_out"]), 0, 0)
         states.addWidget(self._card_grid("Control and safety", ["mode_req", "decision", "swen_req", "safe", "uvlo", "fault_latched", "fault_bits"]), 0, 1)
         states.addWidget(self._card_grid("CAN", ["can_bus", "can_p_valid", "can_p_fresh", "can_e_valid", "can_e_fresh", "can_e_disabled", "can_swen", "can_swen_valid", "can_swen_fresh"]), 1, 0)
         states.addWidget(self._card_grid("UART and manual", ["uart_p_valid", "uart_p_fresh", "uart_e_valid", "uart_e_fresh", "uart_swen_req", "man_p_valid", "man_swen", "man_swen_valid", "btn_swen", "btn_swen_valid"]), 1, 1)
-        layout.addLayout(states, 2)
         return page
-
-    def _signals_page(self) -> QtWidgets.QWidget:
-        page = QtWidgets.QWidget()
-        grid = QtWidgets.QGridLayout(page)
-        self._add_plot(grid, 0, 0, "Raw ADC counts", ["adc_vcap", "adc_vbus", "adc_iload", "adc_iop", "adc_ion"])
-        self._add_plot(grid, 0, 1, "DAC counts", ["dac1_ch1", "dac1_ch2", "dac3_ch1", "dac3_ch2"])
-        self._add_plot(grid, 1, 0, "Current and voltage", ["vb_mV", "vc_mV", "il_mA", "iop_mA", "ion_mA", "io_mA", "ic_mA"])
-        self._add_plot(grid, 1, 1, "Sequence and diagnostics", ["seq", "adc_hz", "usb_drop", "dma_last", "dma_max", "fault_healthy_ms"])
-        self._add_plot(grid, 2, 0, "Command values", ["pset_W", "can_p", "can_e", "uart_p", "uart_e", "man_p"])
-        return page
-
-    def _add_plot(self, layout: QtWidgets.QGridLayout, row: int, column: int, title: str, names: list[str]) -> None:
-        panel = PlotPanel(title, names, self.history, self.times)
-        self.plot_panels.append(panel)
-        layout.addWidget(panel, row, column)
 
     def refresh_ports(self) -> None:
         selected = self.port_combo.currentText()
@@ -377,15 +324,17 @@ class Dashboard(QtWidgets.QMainWindow):
         self.consume_sample(demo_sample(self.demo_sequence))
 
     def poll_events(self) -> None:
-        changed = False
+        latest_sample: dict[str, int] | None = None
         while True:
             try:
                 event, data = self.events.get_nowait()
             except queue.Empty:
                 break
             if event == "sample":
-                self.consume_sample(data)
-                changed = True
+                if self.last_seq is not None and data["seq"] > self.last_seq + 1:
+                    self.frame_gaps += data["seq"] - self.last_seq - 1
+                self.last_seq = data["seq"]
+                latest_sample = data
             elif event == "connected":
                 self.connection.setText(f"Connected: {data}")
             elif event == "error":
@@ -398,22 +347,16 @@ class Dashboard(QtWidgets.QMainWindow):
                 self.connect_button.setText("Connect")
                 if not self.args.demo:
                     self.connection.setText("Disconnected")
-        if changed:
-            for panel in self.plot_panels:
-                panel.refresh()
+        if latest_sample is not None:
+            self.consume_sample(latest_sample)
 
     def consume_sample(self, sample: dict[str, int]) -> None:
-        now = time.monotonic()
         self.last_sample = sample
-        if self.last_seq is not None and sample["seq"] > self.last_seq + 1:
-            self.frame_gaps += sample["seq"] - self.last_seq - 1
-        self.last_seq = sample["seq"]
-        self.times.append(now)
-        for name, values in self.history.items():
-            value = float(sample[name])
-            valid_name = VALIDITY_FIELD.get(name)
-            values.append(value if valid_name is None or sample[valid_name] else math.nan)
         for name, card in self.numeric_cards.items():
+            if name in VALIDITY_FIELD:
+                text, state = status_text_and_state(name, sample)
+                card.set_state(text, state)
+                continue
             field = FIELD_BY_NAME[name]
             suffix = f" {field.unit}" if field.unit else ""
             card.set_state(f"{sample[name]:,}{suffix}", "blue")
