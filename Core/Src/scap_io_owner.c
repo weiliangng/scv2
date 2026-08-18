@@ -129,8 +129,26 @@ bool ScapIo_IsFaultLatched(void)
   return s_fault_latched != 0u;
 }
 
-bool ScapIo_FastUpdateUvlo(float v_bus)
+bool ScapIo_IsUvloLockout(void)
 {
+  return s_uvlo_lockout != 0u;
+}
+
+uint8_t ScapIo_FastUpdateSafety(uint8_t fault_bits, float v_bus)
+{
+  if (fault_bits != 0u)
+  {
+    s_fault_bits |= fault_bits;
+    s_fault_latched = 1u;
+    s_fault_clear_request = 0u;
+  }
+  else if ((s_fault_latched != 0u) && (s_fault_clear_request != 0u))
+  {
+    s_fault_bits = 0u;
+    s_fault_latched = 0u;
+    s_fault_clear_request = 0u;
+  }
+
   if (s_uvlo_lockout != 0u)
   {
     if (v_bus >= SCAP_UVLO_EXIT_V)
@@ -142,30 +160,17 @@ bool ScapIo_FastUpdateUvlo(float v_bus)
   {
     s_uvlo_lockout = 1u;
   }
-  return s_uvlo_lockout != 0u;
-}
 
-bool ScapIo_IsUvloLockout(void)
-{
-  return s_uvlo_lockout != 0u;
-}
-
-void ScapIo_FastUpdateFault(uint8_t fault_bits)
-{
-  if (fault_bits != 0u)
+  uint8_t state = 0u;
+  if (s_fault_latched != 0u)
   {
-    s_fault_bits |= fault_bits;
-    s_fault_latched = 1u;
-    s_fault_clear_request = 0u;
-    return;
+    state |= SCAP_FAST_SAFETY_FAULT_LATCHED;
   }
-
-  if ((s_fault_latched != 0u) && (s_fault_clear_request != 0u))
+  if (s_uvlo_lockout != 0u)
   {
-    s_fault_bits = 0u;
-    s_fault_latched = 0u;
-    s_fault_clear_request = 0u;
+    state |= SCAP_FAST_SAFETY_UVLO_LOCKOUT;
   }
+  return state;
 }
 
 void ScapIo_HandlePushbuttonFromIsr(uint32_t timestamp_ms)

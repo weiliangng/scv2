@@ -30,6 +30,12 @@ enum
   CONTROL_FAULT_VCAP_OVP = 1u << 1,
 };
 
+enum
+{
+  SCAP_FAST_SAFETY_FAULT_LATCHED = 1u << 0,
+  SCAP_FAST_SAFETY_UVLO_LOCKOUT = 1u << 1,
+};
+
 typedef struct
 {
   control_mode_request_t mode_request;
@@ -62,13 +68,12 @@ control_mode_request_t ScapIo_GetModeRequest(void);
 bool ScapIo_IsDirectMode(void);
 void ScapIo_ReadStatus(control_status_t *status);
 
-/* Called from the ADC ISR.  A fault latches immediately; clearing is ISR-owned. */
-void ScapIo_FastUpdateFault(uint8_t fault_bits);
 bool ScapIo_IsFaultLatched(void);
 
-/* Called from the ADC ISR.  UVLO enters at <=10 V and clears at >=11 V. */
-bool ScapIo_FastUpdateUvlo(float v_bus);
 bool ScapIo_IsUvloLockout(void);
+
+/* Called from the ADC ISR. Updates fault first, then UVLO, and returns both states. */
+uint8_t ScapIo_FastUpdateSafety(uint8_t fault_bits, float v_bus);
 
 /* Called from the debounced pushbutton ISR. */
 void ScapIo_HandlePushbuttonFromIsr(uint32_t timestamp_ms);

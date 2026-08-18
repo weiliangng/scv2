@@ -333,11 +333,17 @@ void DMA1_Channel1_IRQHandler(void)
     const uint16_t n_adc_vbus = g_adc1_dma_buf[1] & 0x0FFFU;
     const uint16_t n_adc_vcap = g_adc1_dma_buf[0] & 0x0FFFU;
 
-    // ADC2 (see `shared_state.h`): [0]=ILOAD differential (offset-binary)
-    const uint16_t n_adc_iload = g_adc2_dma_buf[0] & 0x0FFFU;
-
     const float v_bus = (A_VBUS * (float)n_adc_vbus) + B_VBUS;
     const float v_cap = (A_VCAP * (float)n_adc_vcap) + B_VCAP;
+
+    const uint8_t fault_bits = ScapSafety_FaultBits(v_bus, v_cap);
+    g_is_safe = (fault_bits == 0u);
+    const uint8_t safety_state = ScapIo_FastUpdateSafety(fault_bits, v_bus);
+    const bool fault_latched = (safety_state & SCAP_FAST_SAFETY_FAULT_LATCHED) != 0u;
+    const bool uvlo_lockout = (safety_state & SCAP_FAST_SAFETY_UVLO_LOCKOUT) != 0u;
+
+    // ADC2 (see `shared_state.h`): [0]=ILOAD differential (offset-binary)
+    const uint16_t n_adc_iload = g_adc2_dma_buf[0] & 0x0FFFU;
     const float i_load = (A_ILOAD * (float)n_adc_iload) + B_ILOAD;
 
     control_fast_command_t command;
@@ -358,12 +364,7 @@ void DMA1_Channel1_IRQHandler(void)
     g_latest.i_load = i_load;
     g_latest.i_conv = i_conv;
 
-    const uint8_t fault_bits = ScapSafety_FaultBits(v_bus, v_cap);
-    g_is_safe = (fault_bits == 0u);
-    ScapIo_FastUpdateFault(fault_bits);
-    const bool uvlo_lockout = ScapIo_FastUpdateUvlo(v_bus);
-
-    if (ScapIo_IsFaultLatched())
+    if (fault_latched)
     {
       gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, 0u);
       const uint32_t fault_led_phase = (g_adc_seq_count / 10000u) & 1u; /* 5 Hz */
