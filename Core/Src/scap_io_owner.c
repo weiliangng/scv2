@@ -214,13 +214,13 @@ void ScapIo_Resolve1kHz(void)
 
   const bool can_fresh = CommandInputs_IsFresh(can_command.can_cmd_timestamp != 0u ? can_command.can_cmd_timestamp : 0u,
                                                 can_command.can_cmd_timestamp != 0u,
-                                                now_ms, SCAP_CAN_FRESH_TIMEOUT_MS);
+                                                now_ms, SCAP_COMMAND_FRESH_TIMEOUT_MS);
   const bool uart_power_fresh = CommandInputs_IsFresh(uart_command.power_w.timestamp_ms,
                                                        uart_command.power_w.present,
-                                                       now_ms, SCAP_UART_FRESH_TIMEOUT_MS);
+                                                       now_ms, SCAP_COMMAND_FRESH_TIMEOUT_MS);
   const bool uart_energy_fresh = CommandInputs_IsFresh(uart_command.energy_j.timestamp_ms,
                                                         uart_command.energy_j.present,
-                                                        now_ms, SCAP_UART_FRESH_TIMEOUT_MS);
+                                                        now_ms, SCAP_COMMAND_FRESH_TIMEOUT_MS);
   const bool fault_latched = ScapIo_IsFaultLatched();
   const bool uvlo_lockout = ScapIo_IsUvloLockout();
   static uint16_t healthy_ms;

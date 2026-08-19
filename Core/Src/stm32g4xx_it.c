@@ -395,7 +395,11 @@ void DMA1_Channel1_IRQHandler(void)
           desired_swen = (command.swen_request && command.energy_swen_allowed) ? 1u : 0u;
         }
         desired_swen = SwenMinOnOff(desired_swen);
-        led_desired = desired_swen != 0u ? GPIO_LED_Pin : 0u;
+        if ((command.decision != CONTROL_DECISION_IDLE) &&
+            (command.decision != CONTROL_DECISION_NO_SOURCE))
+        {
+          led_desired = desired_swen != 0u ? GPIO_LED_Pin : 0u;
+        }
       }
       if (desired_swen != g_swen_last_applied)
       {

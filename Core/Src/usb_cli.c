@@ -318,7 +318,6 @@ static void usbcli_cmd_status(void)
   {
     STATUS_AVG_SAMPLES = 1000,
     STATUS_AVG_DELAY_MS = 1,
-    STATUS_CAN_VALID_MS = 1000,
   };
 
   int64_t sum_v_bus_mV = 0;
@@ -364,9 +363,10 @@ static void usbcli_cmd_status(void)
   CommandInputs_ReadManualSnapshot(&manual_command);
   CommandInputs_ReadPushbuttonSnapshot(&pushbutton_command);
   const uint32_t can_status_now_ms = HAL_GetTick();
-  const bool can_command_valid =
-      (can_command.can_cmd_timestamp != 0u) &&
-      ((uint32_t)(can_status_now_ms - can_command.can_cmd_timestamp) <= STATUS_CAN_VALID_MS);
+  const bool can_command_fresh = CommandInputs_IsFresh(can_command.can_cmd_timestamp,
+                                                        can_command.can_cmd_timestamp != 0u,
+                                                        can_status_now_ms,
+                                                        SCAP_COMMAND_FRESH_TIMEOUT_MS);
   const bool can_bus_up = CanProtocol_IsBusActive(can_status_now_ms);
   DbgUsb_GetStats(&dbg_stats);
 
@@ -431,7 +431,7 @@ static void usbcli_cmd_status(void)
                 control_status.can_fresh ? 1u : 0u,
                 control_status.uart_power_fresh ? 1u : 0u,
                 control_status.uart_energy_fresh ? 1u : 0u);
-  if (can_command_valid)
+  if (can_command_fresh)
   {
     usbcli_printf("  CAN command timestamp: %lu ms\r\n", (unsigned long)can_command.can_cmd_timestamp);
     usbcli_printf("  CAN command power: %u W\r\n", (unsigned)can_command.can_power);
@@ -448,7 +448,7 @@ static void usbcli_cmd_status(void)
   }
   else
   {
-    usbcli_puts("no valid cmd received\r\n");
+    usbcli_puts("no fresh CAN command received\r\n");
   }
   if (uart_command.power_w.present)
   {

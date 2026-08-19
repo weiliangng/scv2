@@ -16,9 +16,6 @@
 #define CAN_ENERGY_MAX_J COMMAND_ENERGY_MAX_J
 #define CAN_ENERGY_DISABLED_MAGIC_J 777u
 
-/* Reserved for future control consumers; current consumers are diagnostic only. */
-#define CAN_COMMAND_FRESHNESS_TIMEOUT_MS 500u
-
 /* Diagnostic-only CAN bus activity monitor. */
 #define CAN_BUS_ACTIVITY_POLL_MS 100u
 #define CAN_BUS_ACTIVITY_TIMEOUT_MS 200u
