@@ -28,6 +28,7 @@ extern float N_OFFSET;
 
 // Clamp applied to I_conv in the fast DMA ISR (absolute value, Amps).
 #define I_CONV_CLAMP_ABS_A (10.0f)
+#define I_CAP_CLAMP_ABS_A (15.0f)
 
 /* Control-policy thresholds (compile-time only; not EEPROM calibration). */
 #define SCAP_VBUS_OVP_V                 (30.0f)
