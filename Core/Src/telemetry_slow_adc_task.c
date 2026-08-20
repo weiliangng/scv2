@@ -94,20 +94,7 @@ void TelemetrySlowAdcTask_Run(void const *argument)
   for (;;)
   {
     ScapIo_Resolve1kHz();
-
-    const uint16_t n_adc_imonop = g_adc2_dma_buf[1] & 0x0FFFU;
-    const uint16_t n_adc_imonon = g_adc2_dma_buf[2] & 0x0FFFU;
-
     const float v_cap = g_latest.v_cap;
-
-    const float i_out_p = (A_OP * (float)n_adc_imonop) + B_OP;
-    const float i_out_n = (A_ON * (float)n_adc_imonon) + B_ON;
-
-    const float i_out = (i_out_p > -i_out_n) ? i_out_p : i_out_n;
-
-    g_latest.i_out_p = i_out_p;
-    g_latest.i_out_n = i_out_n;
-    g_latest.i_out = i_out;
 
     const uint32_t now_ms = HAL_GetTick();
     if ((uint32_t)(now_ms - last_can_bus_poll_ms) >= CAN_BUS_ACTIVITY_POLL_MS)
