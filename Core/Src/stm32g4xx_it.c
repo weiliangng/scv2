@@ -348,7 +348,7 @@ void DMA1_Channel1_IRQHandler(void)
     if (fault_latched)
     {
       gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, 0u);
-      const uint32_t fault_led_phase = (g_adc_seq_count / 10000u) & 1u; /* 5 Hz */
+      const uint32_t fault_led_phase = (g_adc_seq_count / 5000u) & 1u; /* 5 Hz */
       gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin,
                              fault_led_phase != 0u ? GPIO_LED_Pin : 0u);
       g_swen_last_applied = 0u;
@@ -367,7 +367,7 @@ void DMA1_Channel1_IRQHandler(void)
       }
       LL_DAC_ConvertDualData12RightAligned(DAC1, n_dac_n, n_dac_p);
       gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, 0u);
-      const uint32_t idle_led_phase = (g_adc_seq_count / 50000u) & 1u; /* 1 Hz */
+      const uint32_t idle_led_phase = (g_adc_seq_count / 25000u) & 1u; /* 1 Hz */
       gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin,
                              idle_led_phase != 0u ? GPIO_LED_Pin : 0u);
       g_swen_last_applied = 0u;
@@ -403,7 +403,7 @@ void DMA1_Channel1_IRQHandler(void)
         if ((command.decision == CONTROL_DECISION_IDLE) ||
             (command.decision == CONTROL_DECISION_NO_SOURCE))
         {
-          const uint32_t idle_led_phase = (g_adc_seq_count / 50000u) & 1u; /* 1 Hz */
+          const uint32_t idle_led_phase = (g_adc_seq_count / 25000u) & 1u; /* 1 Hz */
           led_desired = idle_led_phase != 0u ? GPIO_LED_Pin : 0u;
         }
         else if (command.decision == CONTROL_DECISION_MANUAL_SET_ALGO)

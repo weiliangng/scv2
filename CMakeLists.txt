@@ -39,7 +39,7 @@ add_executable(${CMAKE_PROJECT_NAME}
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
-# The 100 kHz ADC1 DMA ISR is latency-critical; leave all other sources at the
+# The 50 kHz ADC1 DMA ISR is latency-critical; leave all other sources at the
 # selected preset's optimization level.
 set_source_files_properties(Core/Src/stm32g4xx_it.c PROPERTIES COMPILE_OPTIONS "-O2")
 
