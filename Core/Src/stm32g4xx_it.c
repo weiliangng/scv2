@@ -429,6 +429,7 @@ void DMA1_Channel1_IRQHandler(void)
       }
       gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin, led_desired);
     }
+    if (LL_GPIO_IsOutputPinSet(GPIOB, GPIO_SWEN_Pin) == 0u) g_latest.i_out = 0.0f;
   }
   else
   {
