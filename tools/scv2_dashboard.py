@@ -8,8 +8,10 @@ This program deliberately accepts only that fixed T1 schema.
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import math
 import queue
+import socket
 import sys
 import threading
 import time
@@ -120,6 +122,28 @@ def demo_sample(sequence: int) -> dict[str, int]:
     return sample
 
 
+class NewlineStreamParser:
+    """Reassemble newline-delimited records from arbitrary byte chunks."""
+
+    MAX_BUFFER_BYTES = 1_048_576
+
+    def __init__(self) -> None:
+        self._buffer = bytearray()
+
+    def feed(self, chunk: bytes) -> list[bytes]:
+        """Return complete records, excluding their LF delimiter, in arrival order."""
+        self._buffer.extend(chunk)
+        if len(self._buffer) > self.MAX_BUFFER_BYTES:
+            self._buffer.clear()
+            raise ValueError("unterminated stream data exceeded 1 MiB")
+
+        records: list[bytes] = []
+        while (newline := self._buffer.find(b"\n")) >= 0:
+            records.append(bytes(self._buffer[:newline]))
+            del self._buffer[:newline + 1]
+        return records
+
+
 class SerialReader(threading.Thread):
     def __init__(self, port: str, baud: int, enable_telemetry: bool, events: queue.Queue) -> None:
         super().__init__(name="scv2-serial-reader", daemon=True)
@@ -140,15 +164,13 @@ class SerialReader(threading.Thread):
                 self._started_telemetry = True
             self.events.put(("connected", self.port))
             while not self.stop_requested.is_set():
+                # readline() returns as soon as a telemetry newline arrives.  In
+                # contrast, read(4096) waits for a large batch or the serial
+                # timeout, which adds visible latency to the dashboard.
                 raw = self._serial.readline()
                 if not raw:
                     continue
-                try:
-                    sample = parse_t1(raw.decode("ascii", errors="replace"))
-                    if sample is not None:
-                        self.events.put(("sample", sample))
-                except ValueError as exc:
-                    self.events.put(("parse_error", str(exc)))
+                self.events.put(("packet", raw))
         except (OSError, serial.SerialException) as exc:
             self.events.put(("error", str(exc)))
         finally:
@@ -161,6 +183,39 @@ class SerialReader(threading.Thread):
                 except (OSError, serial.SerialException):
                     pass
             self.events.put(("disconnected", self.port))
+
+
+class UdpReader(threading.Thread):
+    """Receive raw UART bridge datagrams by binding a local UDP port only."""
+
+    def __init__(self, port: int, events: queue.Queue) -> None:
+        super().__init__(name="scv2-udp-reader", daemon=True)
+        self.port, self.events = port, events
+        self.stop_requested = threading.Event()
+        self._socket: socket.socket | None = None
+
+    def stop(self) -> None:
+        self.stop_requested.set()
+
+    def run(self) -> None:
+        try:
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self._socket.bind(("", self.port))
+            self._socket.settimeout(0.2)
+            self.events.put(("connected", f"UDP :{self.port}"))
+            while not self.stop_requested.is_set():
+                try:
+                    raw, sender = self._socket.recvfrom(65_535)
+                except TimeoutError:
+                    continue
+                self.events.put(("packet", raw, sender))
+        except OSError as exc:
+            self.events.put(("error", str(exc)))
+        finally:
+            if self._socket is not None:
+                self._socket.close()
+            self.events.put(("disconnected", f"UDP :{self.port}"))
 
 
 class StatusCard(QtWidgets.QFrame):
@@ -190,7 +245,16 @@ class Dashboard(QtWidgets.QMainWindow):
         super().__init__()
         self.args = args
         self.events: queue.Queue = queue.Queue(maxsize=2000)
-        self.reader: SerialReader | None = None
+        self.reader: SerialReader | UdpReader | None = None
+        self.stream_parser = NewlineStreamParser()
+        self.raw_packets: deque[bytes] = deque(maxlen=200)
+        self.raw_messages: deque[bytes] = deque(maxlen=500)
+        self.data_sample_times: deque[float] = deque()
+        self.packet_count = 0
+        self.last_packet_time: float | None = None
+        self.listen_started_time: float | None = None
+        self.last_sender: tuple[str, int] | None = None
+        self.connection_error: str | None = None
         self.demo_sequence = 0
         self.last_sample: dict[str, int] | None = None
         self.last_seq: int | None = None
@@ -204,15 +268,27 @@ class Dashboard(QtWidgets.QMainWindow):
         self.refresh_ports()
 
         self.poll_timer = QtCore.QTimer(self)
+        self.poll_timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)
         self.poll_timer.timeout.connect(self.poll_events)
-        self.poll_timer.start(30)
+        self.ui_refresh_hz = self.display_refresh_hz()
+        self.poll_timer.start(max(1, round(1000 / self.ui_refresh_hz)))
         self.demo_timer = QtCore.QTimer(self)
         self.demo_timer.timeout.connect(self.add_demo_sample)
         if args.demo:
             self.demo_timer.start(20)
             self.connection.setText("DEMO — simulated T1 telemetry")
+            self.packet_status.setText("Simulated packets")
+            self.packet_status.setStyleSheet("font-weight: 700; color: #15803d;")
+            self.data_rate.setText("Data: demo")
         if args.exit_after:
             QtCore.QTimer.singleShot(int(args.exit_after * 1000), self.close)
+
+    @staticmethod
+    def display_refresh_hz() -> float:
+        """Use the display cadence as the maximum useful card-refresh rate."""
+        screen = QtGui.QGuiApplication.primaryScreen()
+        refresh_hz = screen.refreshRate() if screen is not None else 60.0
+        return refresh_hz if refresh_hz > 1.0 else 60.0
 
     def _build_ui(self) -> None:
         root = QtWidgets.QWidget()
@@ -221,11 +297,19 @@ class Dashboard(QtWidgets.QMainWindow):
         root_layout.setContentsMargins(8, 8, 8, 8)
 
         controls = QtWidgets.QHBoxLayout()
+        self.transport_combo = QtWidgets.QComboBox()
+        self.transport_combo.addItem("USB serial", "serial")
+        self.transport_combo.addItem("UDP listener", "udp")
+        self.transport_combo.setCurrentIndex(1 if self.args.transport == "udp" else 0)
+        self.transport_combo.currentIndexChanged.connect(self.update_transport_controls)
         self.port_combo = QtWidgets.QComboBox()
         self.port_combo.setMinimumWidth(180)
         self.baud = QtWidgets.QSpinBox()
         self.baud.setRange(1200, 2_000_000)
         self.baud.setValue(self.args.baud)
+        self.udp_port = QtWidgets.QSpinBox()
+        self.udp_port.setRange(1, 65_535)
+        self.udp_port.setValue(self.args.udp_port)
         self.refresh_button = QtWidgets.QPushButton("Refresh ports")
         self.refresh_button.clicked.connect(self.refresh_ports)
         self.connect_button = QtWidgets.QPushButton("Connect")
@@ -234,21 +318,46 @@ class Dashboard(QtWidgets.QMainWindow):
         self.auto_telemetry.setChecked(True)
         self.connection = QtWidgets.QLabel("Disconnected")
         self.connection.setStyleSheet("font-weight: 700;")
+        self.packet_status = QtWidgets.QLabel("Not receiving")
+        self.packet_status.setStyleSheet("font-weight: 700; color: #64748b;")
+        self.data_rate = QtWidgets.QLabel("Data: 0 Hz")
+        self.data_rate.setToolTip("Valid T1 records received during the preceding second.")
+        self.data_rate.setStyleSheet("font-weight: 700; color: #1d4ed8;")
+        controls.addWidget(QtWidgets.QLabel("Source"))
+        controls.addWidget(self.transport_combo)
         controls.addWidget(QtWidgets.QLabel("Port"))
         controls.addWidget(self.port_combo)
         controls.addWidget(QtWidgets.QLabel("Baud"))
         controls.addWidget(self.baud)
+        controls.addWidget(QtWidgets.QLabel("UDP port"))
+        controls.addWidget(self.udp_port)
         controls.addWidget(self.refresh_button)
         controls.addWidget(self.connect_button)
         controls.addWidget(self.auto_telemetry)
         controls.addStretch(1)
         controls.addWidget(self.connection)
+        controls.addWidget(self.packet_status)
+        controls.addWidget(self.data_rate)
         root_layout.addLayout(controls)
 
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.addTab(self._live_values_page(), "Live values")
         self.tabs.addTab(self._status_page(), "Status")
         root_layout.addWidget(self.tabs)
+        self.update_transport_controls()
+
+    def using_udp(self) -> bool:
+        return self.transport_combo.currentData() == "udp"
+
+    def update_transport_controls(self) -> None:
+        udp = self.using_udp()
+        connected = self.reader is not None
+        self.port_combo.setEnabled(not udp and not connected)
+        self.baud.setEnabled(not udp and not connected)
+        self.refresh_button.setEnabled(not udp and not connected)
+        self.auto_telemetry.setEnabled(not udp and not connected)
+        self.udp_port.setEnabled(udp and not connected)
+        self.transport_combo.setEnabled(not connected)
 
     def _card_grid(self, title: str, names: list[str], columns: int = 4) -> QtWidgets.QGroupBox:
         box = QtWidgets.QGroupBox(title)
@@ -310,14 +419,28 @@ class Dashboard(QtWidgets.QMainWindow):
             self.reader.stop()
             self.connect_button.setEnabled(False)
             return
-        port = self.selected_port()
-        if not port:
-            QtWidgets.QMessageBox.warning(self, "No serial port", "Connect the SCV2 USB device, then click Refresh ports.")
-            return
-        self.reader = SerialReader(port, self.baud.value(), self.auto_telemetry.isChecked(), self.events)
+        self.stream_parser = NewlineStreamParser()
+        self.packet_count = 0
+        self.data_sample_times.clear()
+        self.last_packet_time = None
+        self.listen_started_time = time.monotonic()
+        self.last_sender = None
+        self.connection_error = None
+        if self.using_udp():
+            self.reader = UdpReader(self.udp_port.value(), self.events)
+            self.connection.setText(f"Binding UDP :{self.udp_port.value()}…")
+        else:
+            port = self.selected_port()
+            if not port:
+                QtWidgets.QMessageBox.warning(self, "No serial port", "Connect the SCV2 USB device, then click Refresh ports.")
+                return
+            self.reader = SerialReader(port, self.baud.value(), self.auto_telemetry.isChecked(), self.events)
+            self.connection.setText(f"Connecting to {port}…")
         self.reader.start()
-        self.connection.setText(f"Connecting to {port}…")
         self.connect_button.setText("Disconnect")
+        self.packet_status.setText("Waiting for packets…")
+        self.packet_status.setStyleSheet("font-weight: 700; color: #b45309;")
+        self.update_transport_controls()
 
     def add_demo_sample(self) -> None:
         self.demo_sequence += 1
@@ -327,28 +450,96 @@ class Dashboard(QtWidgets.QMainWindow):
         latest_sample: dict[str, int] | None = None
         while True:
             try:
-                event, data = self.events.get_nowait()
+                message = self.events.get_nowait()
             except queue.Empty:
                 break
+            event, data, *extra = message
             if event == "sample":
                 if self.last_seq is not None and data["seq"] > self.last_seq + 1:
                     self.frame_gaps += data["seq"] - self.last_seq - 1
                 self.last_seq = data["seq"]
                 latest_sample = data
+            elif event == "packet":
+                sample = self.consume_packet(data, extra[0] if extra else None)
+                if sample is not None:
+                    latest_sample = sample
             elif event == "connected":
                 self.connection.setText(f"Connected: {data}")
             elif event == "error":
+                self.connection_error = data
                 self.connection.setText(f"Error: {data}")
+                self.packet_status.setText("Receiver error")
+                self.packet_status.setStyleSheet("font-weight: 700; color: #b91c1c;")
             elif event == "parse_error":
                 self.connection.setText(f"Ignored malformed telemetry: {data}")
             elif event == "disconnected":
                 self.reader = None
                 self.connect_button.setEnabled(True)
                 self.connect_button.setText("Connect")
-                if not self.args.demo:
+                if not self.args.demo and self.connection_error is None:
                     self.connection.setText("Disconnected")
+                    self.packet_status.setText("Not receiving")
+                    self.packet_status.setStyleSheet("font-weight: 700; color: #64748b;")
+                self.update_transport_controls()
         if latest_sample is not None:
             self.consume_sample(latest_sample)
+        self.update_packet_status()
+        self.update_data_rate()
+
+    def consume_packet(self, raw: bytes, sender: tuple[str, int] | None) -> dict[str, int] | None:
+        """Keep incoming datagrams intact, then parse complete stream records from them."""
+        self.raw_packets.append(raw)
+        self.packet_count += 1
+        self.last_packet_time = time.monotonic()
+        if sender is not None:
+            self.last_sender = sender
+        try:
+            records = self.stream_parser.feed(raw)
+        except ValueError as exc:
+            self.connection.setText(f"Stream reset: {exc}")
+            return None
+        latest_sample: dict[str, int] | None = None
+        for raw_record in records:
+            self.raw_messages.append(raw_record)
+            try:
+                # UART data is raw bytes; replacement keeps malformed UTF-8 display-safe.
+                sample = parse_t1(raw_record.decode("utf-8", errors="replace"))
+                if sample is not None:
+                    if self.last_seq is not None and sample["seq"] > self.last_seq + 1:
+                        self.frame_gaps += sample["seq"] - self.last_seq - 1
+                    self.last_seq = sample["seq"]
+                    self.data_sample_times.append(time.monotonic())
+                    latest_sample = sample
+            except ValueError as exc:
+                self.connection.setText(f"Ignored malformed telemetry: {exc}")
+        return latest_sample
+
+    def update_packet_status(self) -> None:
+        if self.args.demo or self.reader is None:
+            return
+        if self.last_packet_time is None:
+            waiting = time.monotonic() - (self.listen_started_time or time.monotonic())
+            if waiting >= self.args.packet_timeout:
+                text, color = f"No packets received for {waiting:.1f} s", "#b91c1c"
+            else:
+                text, color = "Waiting for packets…", "#b45309"
+        else:
+            age = time.monotonic() - self.last_packet_time
+            if age >= self.args.packet_timeout:
+                text, color = f"No packets for {age:.1f} s", "#b91c1c"
+            else:
+                source = f" from {self.last_sender[0]}:{self.last_sender[1]}" if self.last_sender else ""
+                text, color = f"Receiving: {self.packet_count} packets{source}", "#15803d"
+        self.packet_status.setText(text)
+        self.packet_status.setStyleSheet(f"font-weight: 700; color: {color};")
+
+    def update_data_rate(self) -> None:
+        if self.args.demo:
+            return
+        cutoff = time.monotonic() - 1.0
+        while self.data_sample_times and self.data_sample_times[0] < cutoff:
+            self.data_sample_times.popleft()
+        self.data_rate.setText(f"Data: {len(self.data_sample_times)} Hz")
 
     def consume_sample(self, sample: dict[str, int]) -> None:
         self.last_sample = sample
@@ -417,17 +608,28 @@ def self_test() -> None:
     assert parse_t1("CLI ready") is None
     assert status_text_and_state("decision", parsed) == ("CAN", "green")
     assert status_text_and_state("can_p", {**parsed, "can_p_valid": 0}) == ("INVALID", "grey")
-    print("T1 parser and state-display self-test passed.")
+    stream = NewlineStreamParser()
+    assert stream.feed(b"CLI ready\nT1,1") == [b"CLI ready"]
+    assert stream.feed(b",2\r\nlast") == [b"T1,1,2\r"]
+    assert stream.feed(b" message\n") == [b"last message"]
+    print("T1 parser, UDP stream buffering, and state-display self-test passed.")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", help="COM port to open, for example COM8")
     parser.add_argument("--baud", type=int, default=115200)
+    parser.add_argument("--transport", choices=("serial", "udp"), default="serial", help="Initial input source")
+    parser.add_argument("--udp-port", type=int, default=14551, help="Local UDP port to bind when using the UDP listener")
+    parser.add_argument("--packet-timeout", type=float, default=3.0, help="Seconds without a packet before showing a timeout")
     parser.add_argument("--demo", action="store_true", help="Show simulated telemetry without hardware")
     parser.add_argument("--exit-after", type=float, help="Close automatically after this many seconds (test helper)")
     parser.add_argument("--self-test", action="store_true", help="Validate CSV parsing and display rules, then exit")
     args = parser.parse_args()
+    if not 1 <= args.udp_port <= 65_535:
+        parser.error("--udp-port must be between 1 and 65535")
+    if args.packet_timeout <= 0:
+        parser.error("--packet-timeout must be positive")
     if args.self_test:
         self_test()
         return 0

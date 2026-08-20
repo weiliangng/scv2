@@ -95,7 +95,9 @@ Start it by double-clicking `Start SCV2 Dashboard.cmd`, or run:
 .venv\Scripts\python.exe tools\scv2_dashboard.py --port COM8
 ```
 
-For USB CDC, the dashboard enables `telemetry on` when it connects and sends `telemetry off` before disconnecting. For an external USB-UART receiver connected to PA9, select 921600 baud and uncheck "Enable USB telemetry while connected"; USART1 is already streaming. Use `--demo` to inspect the display without a board.
+For USB CDC, the dashboard enables `telemetry on` when it connects and sends `telemetry off` before disconnecting. For an external USB-UART receiver connected to PA9, select 921600 baud and uncheck "Enable USB telemetry while connected"; USART1 is already streaming.
+
+For the ESP32 UART bridge, select **UDP listener**, leave **UDP port** at `14551` for UART1, and connect. The dashboard binds that local port and only receives raw datagrams; it does not send discovery traffic or expect a reply from `192.168.4.1`. Datagram boundaries are not treated as telemetry-message boundaries: received bytes are buffered until a newline completes a record. Use `--transport udp --udp-port 14551` to open in that mode. Use `--demo` to inspect the display without a board.
 
 ## CAN five-byte command test guide
 
