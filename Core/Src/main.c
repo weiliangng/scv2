@@ -31,6 +31,7 @@
 #include "can_protocol.h"
 #include "command_inputs.h"
 #include "shared_state.h"
+#include "telemetry_uart.h"
 #include "telemetry_slow_adc_task.h"
 #include "referee_uart.h"
 #include "nvm_eeprom.h"
@@ -194,6 +195,7 @@ int main(void)
   ScapIo_Init();
   CycleCountWatchdog_Init();
   DbgUsb_Init();
+  TelemetryUart_Init(&huart1);
   UsbCli_Init();
 #if USE_HAL_FDCAN_REGISTER_CALLBACKS == 1
   if (HAL_FDCAN_RegisterRxFifo0Callback(&hfdcan1, HAL_FDCAN_RxFifo0Callback) != HAL_OK)
@@ -1194,12 +1196,6 @@ void StartTelemetryTask(void const * argument)
   char msg[640];
   for(;;)
   {
-    if (!g_telemetry_enabled)
-    {
-      osDelay(50);
-      continue;
-    }
-
     const uint32_t now_ms = HAL_GetTick();
     if (last_adc_rate_ms == 0U)
     {
@@ -1352,7 +1348,11 @@ void StartTelemetryTask(void const * argument)
         msg[sizeof(msg) - 1U] = '\0';
         msg_len = sizeof(msg) - 1U;
       }
-      (void)dbg_try_write((const uint8_t *)msg, (uint16_t)msg_len);
+      (void)TelemetryUart_TryWrite((const uint8_t *)msg, (uint16_t)msg_len);
+      if (g_usb_telemetry_enabled)
+      {
+        (void)dbg_try_write((const uint8_t *)msg, (uint16_t)msg_len);
+      }
     }
     osDelay(10);
   }

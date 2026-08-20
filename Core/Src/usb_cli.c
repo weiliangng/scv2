@@ -7,6 +7,7 @@
 #include "stream_buffer.h"
 #include "task.h"
 #include "task_dbg_over_usb.h"
+#include "telemetry_uart.h"
 
 #include "main.h"
 #include "app_constants.h"
@@ -299,7 +300,7 @@ static void usbcli_cmd_help(void)
       "Commands:\r\n"
       "  help\r\n"
       "  status\r\n"
-      "  telemetry on|off|toggle\r\n"
+      "  telemetry on|off|toggle  (USB mirror; USART1 is always on)\r\n"
       "  ctrl <external|manual|measure|direct>\r\n"
       "  pset <-240..240>\r\n"
       "  swen <0|1>\r\n"
@@ -326,6 +327,7 @@ static void usbcli_cmd_status(void)
   int64_t sum_i_out_mA = 0;
   int64_t sum_i_conv_mA = 0;
   DbgUsbStats dbg_stats;
+  TelemetryUartStats telemetry_uart_stats;
 
   for (uint32_t i = 0; i < STATUS_AVG_SAMPLES; i++)
   {
@@ -369,6 +371,7 @@ static void usbcli_cmd_status(void)
                                                         SCAP_COMMAND_FRESH_TIMEOUT_MS);
   const bool can_bus_up = CanProtocol_IsBusActive(can_status_now_ms);
   DbgUsb_GetStats(&dbg_stats);
+  TelemetryUart_GetStats(&telemetry_uart_stats);
 
   const unsigned swen = (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_SWEN_Pin) != GPIO_PIN_RESET) ? 1u : 0u);
   const unsigned mode_msb = (unsigned)((HAL_GPIO_ReadPin(GPIOB, GPIO_MODEMSB_Pin) != GPIO_PIN_RESET) ? 1u : 0u);
@@ -385,7 +388,8 @@ static void usbcli_cmd_status(void)
   const uint32_t dac3_1_mV = (uint32_t)((dac3_1_u12 * 3300u + 2047u) / 4095u);
 
   usbcli_printf("Control:\r\n");
-  usbcli_printf("  Telemetry streaming enabled: %s\r\n", g_telemetry_enabled ? "yes" : "no");
+  usbcli_printf("  USB telemetry mirror enabled: %s\r\n", g_usb_telemetry_enabled ? "yes" : "no");
+  usbcli_printf("  USART1 telemetry streaming: always on\r\n");
   usbcli_printf("  Current mode: %s\r\n", ScapIo_DecisionName(control_status.decision));
   usbcli_printf("  Switch enable output (SWEN) pin: %u\r\n", swen);
   usbcli_printf("  Mode selection pins (MODE[1:0]): %u%u (decoded=%u)\r\n", mode_msb, mode_lsb, mode_u2);
@@ -424,7 +428,7 @@ static void usbcli_cmd_status(void)
   usbcli_printf("  Power setpoint: %ld W\r\n", (long)g_latest.p_set);
 
   usbcli_printf("Telemetry and link status:\r\n");
-  usbcli_printf("  USB telemetry sequence number: %lu\r\n", (unsigned long)telemetry_seq);
+  usbcli_printf("  T1 telemetry sequence number: %lu\r\n", (unsigned long)telemetry_seq);
   usbcli_printf("  ADC trigger frequency estimate: %lu Hz\r\n", (unsigned long)adc_seq_hz);
   usbcli_printf("  CAN bus activity up: %u\r\n", can_bus_up ? 1u : 0u);
   usbcli_printf("  Freshness CAN/UART-power/UART-energy: %u/%u/%u\r\n",
@@ -501,6 +505,11 @@ static void usbcli_cmd_status(void)
                 (unsigned long)dbg_stats.telemetry_records_dropped);
   usbcli_printf("  USB telemetry bytes queued: %lu\r\n", (unsigned long)dbg_stats.telemetry_bytes_queued);
   usbcli_printf("  USB disconnects: %lu\r\n", (unsigned long)dbg_stats.usb_disconnect_count);
+  usbcli_printf("  USART1 telemetry records queued/dropped: %lu/%lu\r\n",
+                (unsigned long)telemetry_uart_stats.records_queued,
+                (unsigned long)telemetry_uart_stats.records_dropped);
+  usbcli_printf("  USART1 telemetry bytes queued: %lu\r\n",
+                (unsigned long)telemetry_uart_stats.bytes_queued);
 
   usbcli_printf("DMA interrupt timing:\r\n");
   usbcli_printf("  DMA1 channel 1 ISR cycles (last): %lu\r\n", (unsigned long)g_dma1_ch1_irq_cycles_last);
@@ -517,15 +526,15 @@ static void usbcli_cmd_telemetry(int argc, char **argv)
 
   if (usbcli_streq(argv[1], "on"))
   {
-    g_telemetry_enabled = true;
+    g_usb_telemetry_enabled = true;
   }
   else if (usbcli_streq(argv[1], "off"))
   {
-    g_telemetry_enabled = false;
+    g_usb_telemetry_enabled = false;
   }
   else if (usbcli_streq(argv[1], "toggle"))
   {
-    g_telemetry_enabled = !g_telemetry_enabled;
+    g_usb_telemetry_enabled = !g_usb_telemetry_enabled;
   }
   else
   {
@@ -533,7 +542,8 @@ static void usbcli_cmd_telemetry(int argc, char **argv)
     return;
   }
 
-  usbcli_printf("telemetry=%s\r\n", g_telemetry_enabled ? "on" : "off");
+  usbcli_printf("usb_telemetry=%s; usart1_telemetry=on\r\n",
+                g_usb_telemetry_enabled ? "on" : "off");
 }
 
 static void usbcli_cmd_pset(int argc, char **argv)

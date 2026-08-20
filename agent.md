@@ -1,6 +1,6 @@
-# USB telemetry `T1` decoder
+# Telemetry `T1` decoder
 
-`telemetry on` emits one CSV record every 10 ms. It does not alter control. Every record starts with `T1`; remaining columns are positional and must be decoded in the order below. It is a best-effort snapshot, so DMA, register, and shared-state values can be up to one control cycle apart.
+USART1 emits one CSV record every 10 ms from boot at 921600 baud, 8-N-1. The USB CLI command `telemetry on|off|toggle` controls an independent USB CDC mirror of the same records; it does not affect USART1 or control. Every record starts with `T1`; remaining columns are positional and must be decoded in the order below. It is a best-effort snapshot, so DMA, register, and shared-state values can be up to one control cycle apart.
 
 ## Conventions
 
@@ -14,7 +14,7 @@
 
 | # | Field | Type / range | Meaning and source |
 |---:|---|---|---|
-| 1 | `seq` | continuous, uint32 | USB telemetry record sequence. |
+| 1 | `seq` | continuous, uint32 | T1 telemetry record sequence shared by USART1 and USB. |
 | 2 | `adc_hz` | continuous, Hz | Measured ADC1 DMA sequence rate. |
 | 3 | `usb_drop` | continuous, uint32 | Cumulative records rejected by the lossy USB telemetry queue. |
 | 4 | `dma_last` | continuous, cycles | Last ADC1 DMA ISR execution time. |
@@ -95,7 +95,7 @@ Start it by double-clicking `Start SCV2 Dashboard.cmd`, or run:
 .venv\Scripts\python.exe tools\scv2_dashboard.py --port COM8
 ```
 
-The dashboard enables `telemetry on` when it connects and sends `telemetry off` before disconnecting. Use `--demo` to inspect the display without a board.
+For USB CDC, the dashboard enables `telemetry on` when it connects and sends `telemetry off` before disconnecting. For an external USB-UART receiver connected to PA9, select 921600 baud and uncheck "Enable USB telemetry while connected"; USART1 is already streaming. Use `--demo` to inspect the display without a board.
 
 ## CAN five-byte command test guide
 

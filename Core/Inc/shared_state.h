@@ -57,7 +57,7 @@ extern volatile bool g_is_safe;
 /*
  * Telemetry helpers computed in task context.
  * - g_adc_seq_hz: estimated ADC trigger/sequence rate (Hz).
- * - g_telemetry_seq: sequence counter for USB telemetry frames.
+ * - g_telemetry_seq: sequence counter for T1 telemetry records.
  */
 extern volatile uint32_t g_adc_seq_hz;
 extern volatile uint32_t g_telemetry_seq;
@@ -80,9 +80,8 @@ extern volatile uint16_t g_adc1_dma_buf[2];
 extern volatile uint16_t g_adc2_dma_buf[3];
 
 /*
- * Telemetry stream enable:
- * - When disabled, the telemetry task stays idle (no USB output spam while using the CLI).
+ * USB telemetry mirror enable. USART1 telemetry is always enabled after boot.
  */
-extern volatile bool g_telemetry_enabled;
+extern volatile bool g_usb_telemetry_enabled;
 
 #endif /* SHARED_STATE_H */

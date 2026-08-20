@@ -21,4 +21,4 @@ volatile uint32_t g_telemetry_seq;
 volatile uint16_t g_adc1_dma_buf[2];
 volatile uint16_t g_adc2_dma_buf[3];
 
-volatile bool g_telemetry_enabled = false;
+volatile bool g_usb_telemetry_enabled = false;

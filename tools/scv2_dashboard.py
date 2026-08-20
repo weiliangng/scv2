@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Live, read-only visualizer for the SCV2 T1 USB telemetry stream.
+"""Live, read-only visualizer for the SCV2 T1 telemetry stream.
 
 The authoritative CSV field contract is ``agent.md`` in the repository root.
 This program deliberately accepts only that fixed T1 schema.
@@ -230,7 +230,7 @@ class Dashboard(QtWidgets.QMainWindow):
         self.refresh_button.clicked.connect(self.refresh_ports)
         self.connect_button = QtWidgets.QPushButton("Connect")
         self.connect_button.clicked.connect(self.toggle_connection)
-        self.auto_telemetry = QtWidgets.QCheckBox("Enable telemetry while connected")
+        self.auto_telemetry = QtWidgets.QCheckBox("Enable USB telemetry while connected")
         self.auto_telemetry.setChecked(True)
         self.connection = QtWidgets.QLabel("Disconnected")
         self.connection.setStyleSheet("font-weight: 700;")
