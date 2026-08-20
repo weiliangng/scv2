@@ -316,6 +316,15 @@ void DMA1_Channel1_IRQHandler(void)
     if (denom < 1.0f) { denom = 1.0f; }
     const float inv_v_bus = A_VBUS_INV / denom;
     float i_conv = (p_set * inv_v_bus) - i_load;
+
+    //guard against high cap/low bus voltage done by UVLO
+    //only guards against low cap voltage/high bus voltage
+    float cap_limit = I_CAP_CLAMP_ABS_A;
+    if ((v_bus > 0.0f) && (v_cap > 0.0f)) cap_limit = (v_cap * I_CAP_CLAMP_ABS_A) / v_bus;
+    float i_limit = (cap_limit < I_CONV_CLAMP_ABS_A) ? cap_limit : I_CONV_CLAMP_ABS_A;
+    if (i_conv > i_limit) i_conv = i_limit;
+    else if (i_conv < -i_limit) i_conv = -i_limit;
+
     if (i_conv > I_CONV_CLAMP_ABS_A) i_conv = I_CONV_CLAMP_ABS_A;
     else if (i_conv < -I_CONV_CLAMP_ABS_A) i_conv = -I_CONV_CLAMP_ABS_A;
 
