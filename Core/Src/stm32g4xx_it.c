@@ -79,8 +79,8 @@ static inline uint16_t clamp_u12(int32_t v)
  *
  * NOTE: These timings assume a fixed CPU clock. If you change clocks, update CPU_HZ.
  */
-#define SWEN_MIN_ON_CYC ((SCAP_CPU_HZ * SCAP_SWEN_MIN_ON_MS) / 1000u)
-#define SWEN_MIN_OFF_CYC ((SCAP_CPU_HZ * SCAP_SWEN_MIN_OFF_MS) / 1000u)
+#define SWEN_MIN_ON_CYC ((SCAP_CPU_HZ / 1000u * SCAP_SWEN_MIN_ON_MS))
+#define SWEN_MIN_OFF_CYC ((SCAP_CPU_HZ / 1000u * SCAP_SWEN_MIN_OFF_MS))
 
 static inline uint8_t SwenMinOnOff(uint8_t req_on)
 {
