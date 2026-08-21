@@ -23,6 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "task_dbg_over_usb.h"
@@ -159,7 +160,9 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  const bool was_iwdg_reset = (__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST) != RESET);
+  __HAL_RCC_CLEAR_RESET_FLAGS();
+  if (was_iwdg_reset){while (1){}}//hang forever
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
