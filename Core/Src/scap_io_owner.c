@@ -339,9 +339,11 @@ void ScapIo_Resolve1kHz(void)
         discharge_vcap_lockout = 1u;
       }
 
-      command.energy_swen_allowed =
-          ((charge_vcap_lockout == 0u) && (command.energy_j > SCAP_ENERGY_CHARGE_J) && (i_conv > 0.0f)) ||
-          ((discharge_vcap_lockout == 0u) && (command.energy_j < SCAP_ENERGY_DISCHARGE_J) && (i_conv < 0.0f));
+      bool can_charge = ((charge_vcap_lockout == 0u) && (command.energy_j > SCAP_ENERGY_CHARGE_J) && (i_conv > 0.0f));
+      bool can_discharge = ((discharge_vcap_lockout == 0u) && (command.energy_j < SCAP_ENERGY_DISCHARGE_J) && (i_conv < 0.0f));
+      command.energy_swen_allowed = can_charge || can_discharge;
+      if (can_charge) command.p_set_w = command.p_set_w + SCAP_POWER_HYSTERESIS;
+      else if (can_discharge) command.p_set_w = command.p_set_w - SCAP_POWER_HYSTERESIS;
     }
   }
 
