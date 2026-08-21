@@ -62,6 +62,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/referee_uart.c
     Core/Src/scap_io_owner.c
     Core/Src/nvm_eeprom.c
+    Core/Src/app_watchdog.c
     Middlewares/ST/EEPROM_Emul/Core/eeprom_emul.c
     Middlewares/ST/EEPROM_Emul/Porting/STM32G4/flash_interface.c
 )

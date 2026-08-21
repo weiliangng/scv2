@@ -37,6 +37,7 @@
 #include "nvm_eeprom.h"
 #include "stm32g4xx_ll_dac.h"
 #include "scap_io_owner.h"
+#include "app_watchdog.h"
 
 /* USER CODE END Includes */
 
@@ -196,6 +197,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
+  AppWatchdog_Init(&hiwdg);
   ScapIo_Init();
   CycleCountWatchdog_Init();
   DbgUsb_Init();
@@ -340,7 +342,7 @@ int main(void)
   uartParsingTaskHandle = osThreadCreate(osThread(uartParsingTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  AppWatchdog_RefreshBeforeScheduler();
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
@@ -1190,11 +1192,7 @@ void StartDefaultTask(void const * argument)
   /* init code for USB_Device */
   MX_USB_Device_Init();
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1000);
-  }
+  AppWatchdog_SupervisorRun(argument);
   /* USER CODE END 5 */
 }
 
@@ -1388,6 +1386,7 @@ void StartTelemetryTask(void const * argument)
         (void)dbg_try_write((const uint8_t *)msg, (uint16_t)msg_len);
       }
     }
+    AppWatchdog_Heartbeat(APP_WATCHDOG_TASK_TELEMETRY);
     osDelay(10);
   }
   /* USER CODE END StartTelemetryTask */

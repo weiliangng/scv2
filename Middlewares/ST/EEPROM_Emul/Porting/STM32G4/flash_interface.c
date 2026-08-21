@@ -20,6 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "eeprom_emul.h"
 #include "flash_interface.h"
+#include "app_watchdog.h"
 
 /** @addtogroup EEPROM_Emulation
   * @{
@@ -72,14 +73,20 @@ EE_Status FI_PageErase(uint32_t Page, uint16_t NbPages)
 #endif
 
   s_eraseinit.TypeErase   = FLASH_TYPEERASE_PAGES;
-  s_eraseinit.NbPages     = NbPages;
-  s_eraseinit.Page        = Page;
+  s_eraseinit.NbPages     = 1U;
   s_eraseinit.Banks       = bank;
 
-  /* Erase the Page: Set Page status to ERASED status */
-  if (HAL_FLASHEx_Erase(&s_eraseinit, &page_error) != HAL_OK)
+  /* Keep each blocking erase below the watchdog period, then checkpoint
+   * only if the runtime supervisor has already established good health. */
+  for (uint16_t page_offset = 0U; page_offset < NbPages; page_offset++)
   {
-    status = EE_ERASE_ERROR;
+    s_eraseinit.Page = Page + page_offset;
+    if (HAL_FLASHEx_Erase(&s_eraseinit, &page_error) != HAL_OK)
+    {
+      status = EE_ERASE_ERROR;
+      break;
+    }
+    AppWatchdog_FlashCheckpoint();
   }
   return status;
 }

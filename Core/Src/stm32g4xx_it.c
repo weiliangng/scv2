@@ -32,6 +32,7 @@
 #include "referee_uart.h"
 #include "eeprom_emul.h"
 #include "scap_io_owner.h"
+#include "app_watchdog.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -345,7 +346,7 @@ void DMA1_Channel1_IRQHandler(void)
     g_latest.i_load = i_load;
     g_latest.i_conv = i_conv;
 
-    if (fault_latched)
+    if ((g_app_watchdog_failed != 0u) || fault_latched)
     {
       gpio_write_masked_bsrr(GPIOB, GPIO_SWEN_Pin, 0u);
       const uint32_t fault_led_phase = (g_adc_seq_count / 5000u) & 1u; /* 5 Hz */

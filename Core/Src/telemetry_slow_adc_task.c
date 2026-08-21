@@ -13,6 +13,7 @@
 #include "task.h"
 
 #include "app_constants.h"
+#include "app_watchdog.h"
 #include "can_protocol.h"
 #include "shared_state.h"
 #include "scap_io_owner.h"
@@ -137,6 +138,7 @@ void TelemetrySlowAdcTask_Run(void const *argument)
       (void)HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &tx_header, data);
     }
 
+    AppWatchdog_Heartbeat(APP_WATCHDOG_TASK_CONTROL);
     osDelay(1);
   }
 }
