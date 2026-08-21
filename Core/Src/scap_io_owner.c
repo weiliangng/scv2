@@ -315,6 +315,7 @@ void ScapIo_Resolve1kHz(void)
       const float v_cap = g_latest.v_cap;
       const float i_conv = g_latest.i_conv;
 
+      //add hysteresis around cap UVLO/cap burst mode emulation
       if (charge_vcap_lockout != 0u)
       {
         if (v_cap <= SCAP_CHARGE_LOCKOUT_RESUME_V)
@@ -339,11 +340,21 @@ void ScapIo_Resolve1kHz(void)
         discharge_vcap_lockout = 1u;
       }
 
-      bool can_charge = ((charge_vcap_lockout == 0u) && (command.energy_j > SCAP_ENERGY_CHARGE_J) && (i_conv > 0.0f));
-      bool can_discharge = ((discharge_vcap_lockout == 0u) && (command.energy_j < SCAP_ENERGY_DISCHARGE_J) && (i_conv < 0.0f));
+      bool can_charge = ((charge_vcap_lockout == 0u) && (i_conv > 0.0f));
+      bool can_discharge = ((discharge_vcap_lockout == 0u) && (i_conv < 0.0f));
+
       command.energy_swen_allowed = can_charge || can_discharge;
-      if (can_charge) command.p_set_w = command.p_set_w + SCAP_POWER_HYSTERESIS;
-      else if (can_discharge) command.p_set_w = command.p_set_w - SCAP_POWER_HYSTERESIS;
+
+      if (can_charge)
+      {
+        if (command.energy_j > SCAP_ENERGY_CHARGE_J) command.p_set_w = command.p_set_w + SCAP_POWER_HYSTERESIS;
+        else command.p_set_w = command.p_set_w - 2*SCAP_POWER_HYSTERESIS;
+      }
+      else if (can_discharge)
+      {
+        if (command.energy_j < SCAP_ENERGY_DISCHARGE_J) command.p_set_w = command.p_set_w - SCAP_POWER_HYSTERESIS;
+        else command.p_set_w = command.p_set_w + 2*SCAP_POWER_HYSTERESIS;
+      }
     }
   }
 
