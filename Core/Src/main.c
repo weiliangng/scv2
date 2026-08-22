@@ -1279,8 +1279,6 @@ void StartTelemetryTask(void const * argument)
     CommandInputs_ReadManualSnapshot(&manual_command);
     CommandInputs_ReadPushbuttonSnapshot(&pushbutton_command);
     ScapIo_ReadStatus(&control_status);
-    control_fast_command_t fast_command;
-    ScapIo_ReadFastCommand(&fast_command);
     DbgUsbStats dbg_stats;
     DbgUsb_GetStats(&dbg_stats);
 
@@ -1343,7 +1341,7 @@ void StartTelemetryTask(void const * argument)
                        (unsigned long)dac3_ch2,
                        (unsigned)control_status.mode_request,
                        (unsigned)control_status.decision,
-                       fast_command.swen_request ? 1u : 0u,
+                       control_status.swen_request ? 1u : 0u,
                        g_is_safe ? 1u : 0u,
                        control_status.uvlo_lockout ? 1u : 0u,
                        control_status.fault_latched ? 1u : 0u,

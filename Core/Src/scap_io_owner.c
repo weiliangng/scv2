@@ -63,10 +63,6 @@ void ScapIo_Init(void)
   const control_fast_command_t disabled = {
       .decision = CONTROL_DECISION_IDLE,
       .p_set_w = 0.0f,
-      .energy_j = 0u,
-      .energy_valid = false,
-      .swen_request = false,
-      .energy_swen_allowed = false,
       .swen_output_request = false,
   };
   s_fast_commands[0] = disabled;
@@ -80,6 +76,7 @@ void ScapIo_Init(void)
   s_first_button_consumed = 0u;
   s_status.mode_request = CONTROL_MODE_EXTERNAL_SET;
   s_status.decision = CONTROL_DECISION_IDLE;
+  s_status.swen_request = false;
   s_last_decision = CONTROL_DECISION_IDLE;
 
   /* HCM is the normal algorithm mode.  Direct mode leaves these pins alone. */
@@ -227,12 +224,12 @@ void ScapIo_Resolve1kHz(void)
   control_fast_command_t command = {
       .decision = CONTROL_DECISION_IDLE,
       .p_set_w = 0.0f,
-      .energy_j = 0u,
-      .energy_valid = false,
-      .swen_request = false,
-      .energy_swen_allowed = false,
       .swen_output_request = false,
   };
+  uint16_t energy_j = 0u;
+  bool energy_valid = false;
+  bool swen_request = false;
+  bool energy_swen_allowed = false;
   const uint32_t now_ms = HAL_GetTick();
   const control_mode_request_t mode = s_mode_request;
 
@@ -298,11 +295,11 @@ void ScapIo_Resolve1kHz(void)
           (!manual_command.swen.present ||
            ((uint32_t)(pushbutton_command.swen.timestamp_ms - manual_command.swen.timestamp_ms) < 0x80000000u)))
       {
-        command.swen_request = pushbutton_command.swen.value;
+        swen_request = pushbutton_command.swen.value;
       }
       else
       {
-        command.swen_request = manual_command.swen.present && manual_command.swen.value;
+        swen_request = manual_command.swen.present && manual_command.swen.value;
       }
       break;
     case CONTROL_MODE_EXTERNAL_SET:
@@ -311,17 +308,17 @@ void ScapIo_Resolve1kHz(void)
       {
         command.decision = CONTROL_DECISION_UART_ALGO;
         command.p_set_w = (float)uart_command.power_w.value;
-        command.energy_j = uart_command.energy_j.value;
-        command.energy_valid = true;
-        command.swen_request = true;
+        energy_j = uart_command.energy_j.value;
+        energy_valid = true;
+        swen_request = true;
       }
       else if (can_fresh)
       {
         command.decision = CONTROL_DECISION_CAN_ALGO;
         command.p_set_w = (float)can_command.can_power;
-        command.energy_j = can_command.can_energy;
-        command.energy_valid = !can_command.can_energy_disabled;
-        command.swen_request = can_command.can_swen;
+        energy_j = can_command.can_energy;
+        energy_valid = !can_command.can_energy_disabled;
+        swen_request = can_command.can_swen;
       }
       else
       {
@@ -332,12 +329,12 @@ void ScapIo_Resolve1kHz(void)
   }
 
   if (((command.decision == CONTROL_DECISION_CAN_ALGO) ||
-       (command.decision == CONTROL_DECISION_UART_ALGO)) && command.swen_request)
+       (command.decision == CONTROL_DECISION_UART_ALGO)) && swen_request)
   {
-    if (!command.energy_valid)
+    if (!energy_valid)
     {
       /* CAN's disabled-energy sentinel removes the buffer-energy gate. */
-      command.energy_swen_allowed = true;
+      energy_swen_allowed = true;
     }
     else
     {
@@ -372,16 +369,16 @@ void ScapIo_Resolve1kHz(void)
       bool can_charge = ((charge_vcap_lockout == 0u) && (i_conv > 0.0f));
       bool can_discharge = ((discharge_vcap_lockout == 0u) && (i_conv < 0.0f));
 
-      command.energy_swen_allowed = can_charge || can_discharge;
+      energy_swen_allowed = can_charge || can_discharge;
 
       if (can_charge)
       {
-        if (command.energy_j > SCAP_ENERGY_CHARGE_J) command.p_set_w = command.p_set_w + SCAP_POWER_HYSTERESIS;
+        if (energy_j > SCAP_ENERGY_CHARGE_J) command.p_set_w = command.p_set_w + SCAP_POWER_HYSTERESIS;
         else command.p_set_w = command.p_set_w - 2*SCAP_POWER_HYSTERESIS;
       }
       else if (can_discharge)
       {
-        if (command.energy_j < SCAP_ENERGY_DISCHARGE_J) command.p_set_w = command.p_set_w - SCAP_POWER_HYSTERESIS;
+        if (energy_j < SCAP_ENERGY_DISCHARGE_J) command.p_set_w = command.p_set_w - SCAP_POWER_HYSTERESIS;
         else command.p_set_w = command.p_set_w + 2*SCAP_POWER_HYSTERESIS;
       }
     }
@@ -416,12 +413,12 @@ void ScapIo_Resolve1kHz(void)
     bool swen_policy_request = false;
     if (command.decision == CONTROL_DECISION_MANUAL_SET_ALGO)
     {
-      swen_policy_request = command.swen_request;
+      swen_policy_request = swen_request;
     }
     else if ((command.decision == CONTROL_DECISION_CAN_ALGO) ||
              (command.decision == CONTROL_DECISION_UART_ALGO))
     {
-      swen_policy_request = command.swen_request && command.energy_swen_allowed;
+      swen_policy_request = swen_request && energy_swen_allowed;
     }
     command.swen_output_request = SwenMinOnOff1kHz(swen_policy_request, swen_output_on, now_ms);
   }
@@ -431,6 +428,7 @@ void ScapIo_Resolve1kHz(void)
 
   s_status.mode_request = mode;
   s_status.decision = command.decision;
+  s_status.swen_request = swen_request;
   s_status.can_fresh = can_fresh;
   s_status.uart_power_fresh = uart_power_fresh;
   s_status.uart_energy_fresh = uart_energy_fresh;

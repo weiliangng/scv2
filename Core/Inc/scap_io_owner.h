@@ -40,6 +40,7 @@ typedef struct
 {
   control_mode_request_t mode_request;
   control_decision_t decision;
+  bool swen_request;
   bool can_fresh;
   bool uart_power_fresh;
   bool uart_energy_fresh;
@@ -53,10 +54,6 @@ typedef struct
 {
   control_decision_t decision;
   float p_set_w;
-  uint16_t energy_j;
-  bool energy_valid;
-  bool swen_request;
-  bool energy_swen_allowed;
   bool swen_output_request;
 } control_fast_command_t;
 
