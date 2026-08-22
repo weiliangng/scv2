@@ -46,7 +46,6 @@ extern float N_OFFSET;
 #define SCAP_MANUAL_DEFAULT_POWER_W     (50.0f)
 #define SCAP_COMMAND_FRESH_TIMEOUT_MS   (300u)
 #define SCAP_FAULT_RECOVERY_MS          (500u)
-#define SCAP_CPU_HZ                     (96000000u)
 #define SCAP_SWEN_MIN_ON_MS             (100u)
 #define SCAP_SWEN_MIN_OFF_MS            (2u)
 

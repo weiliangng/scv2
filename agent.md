@@ -165,7 +165,7 @@ Every rejected payload uses stale B0. Therefore `can_p=85`, `can_e=10`, `can_swe
 
 ### End-to-end controller-effect tests
 
-`decision=4` is only expected in external mode while both UART freshness fields are zero. `ScapIo_Resolve1kHz()` publishes the resolver decision, then the fast ADC ISR applies its safety and timing gates; allow two `T1` samples before treating an output as settled.
+`decision=4` is only expected in external mode while both UART freshness fields are zero. `ScapIo_Resolve1kHz()` selects the source and applies the energy and SWEN timing gates, then the fast ADC ISR applies the published output request plus immediate safety overrides; allow two `T1` samples before treating an output as settled.
 
 | Case | Preconditions and command | Expected observed `T1` values |
 |---|---|---|
@@ -186,4 +186,4 @@ Every rejected payload uses stale B0. Therefore `can_p=85`, `can_e=10`, `can_swe
 
 - Every accepted case has the published mailbox values stated in its row; a rejected case retains stale B0 and never refreshes its CAN freshness fields.
 - `can_bus` is a separate 200 ms diagnostic timer. FIFO0 traffic sets it in the receive callback; non-matching data frames reach FIFO1 and set it only when the 100 ms task poll drains FIFO1; remote frames are hardware-rejected.
-- The resolver and output chain is intentional: CAN packet validation publishes the mailbox, the 1 kHz resolver selects UART before CAN and then applies freshness, and the ADC ISR finally applies safety, energy/Vcap policy, and SWEN timing. A valid packet alone is never sufficient to require `swen_out=1`.
+- The resolver and output chain is intentional: CAN packet validation publishes the mailbox, the 1 kHz resolver selects UART before CAN and then applies freshness, energy/Vcap policy, and SWEN timing; the ADC ISR applies that final output request and immediate safety overrides. A valid packet alone is never sufficient to require `swen_out=1`.

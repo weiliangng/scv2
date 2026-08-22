@@ -57,6 +57,7 @@ typedef struct
   bool energy_valid;
   bool swen_request;
   bool energy_swen_allowed;
+  bool swen_output_request;
 } control_fast_command_t;
 
 void ScapIo_Init(void);

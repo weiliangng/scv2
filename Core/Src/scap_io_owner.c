@@ -17,6 +17,8 @@ static volatile uint8_t s_uvlo_lockout;
 static volatile uint8_t s_first_button_consumed;
 static control_status_t s_status;
 static control_decision_t s_last_decision = CONTROL_DECISION_IDLE;
+static bool s_swen_observed_on;
+static uint32_t s_swen_transition_ms;
 
 static void gpio_write_masked_bsrr(GPIO_TypeDef *port, uint16_t affect_mask, uint16_t desired)
 {
@@ -33,6 +35,29 @@ static void publish_fast_command(const control_fast_command_t *command)
   s_fast_command_index = next;
 }
 
+static bool SwenObserveOutput(uint32_t now_ms)
+{
+  const bool output_on = (GPIO_SWEN_GPIO_Port->ODR & GPIO_SWEN_Pin) != 0u;
+  if (output_on != s_swen_observed_on)
+  {
+    s_swen_observed_on = output_on;
+    s_swen_transition_ms = now_ms;
+  }
+  return output_on;
+}
+
+static bool SwenMinOnOff1kHz(bool request_on, bool output_on, uint32_t now_ms)
+{
+  if (request_on == output_on)
+  {
+    return output_on;
+  }
+
+  const uint32_t elapsed_ms = (uint32_t)(now_ms - s_swen_transition_ms);
+  const uint32_t minimum_ms = output_on ? SCAP_SWEN_MIN_ON_MS : SCAP_SWEN_MIN_OFF_MS;
+  return elapsed_ms >= minimum_ms ? request_on : output_on;
+}
+
 void ScapIo_Init(void)
 {
   const control_fast_command_t disabled = {
@@ -42,6 +67,7 @@ void ScapIo_Init(void)
       .energy_valid = false,
       .swen_request = false,
       .energy_swen_allowed = false,
+      .swen_output_request = false,
   };
   s_fast_commands[0] = disabled;
   s_fast_commands[1] = disabled;
@@ -61,6 +87,8 @@ void ScapIo_Init(void)
                          GPIO_MODELSB_Pin);
   gpio_write_masked_bsrr(GPIOB, GPIO_DIR_Pin | GPIO_SWEN_Pin, 0u);
   gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin, 0u);
+  s_swen_observed_on = false;
+  s_swen_transition_ms = HAL_GetTick();
 }
 
 void ScapIo_SetModeRequest(control_mode_request_t mode)
@@ -203,6 +231,7 @@ void ScapIo_Resolve1kHz(void)
       .energy_valid = false,
       .swen_request = false,
       .energy_swen_allowed = false,
+      .swen_output_request = false,
   };
   const uint32_t now_ms = HAL_GetTick();
   const control_mode_request_t mode = s_mode_request;
@@ -370,8 +399,32 @@ void ScapIo_Resolve1kHz(void)
   }
 
   //manage capacitor derating here (might need to derate capacitor voltage as it fails)
-
-
+  const bool swen_output_on = SwenObserveOutput(now_ms);
+  if ((command.decision == CONTROL_DECISION_DISABLE) || uvlo_lockout ||
+      (command.decision == CONTROL_DECISION_MEASURE))
+  {
+    /* Fast safety and measure-mode shutdown bypass the minimum-ON interval. */
+    command.swen_output_request = false;
+  }
+  else if (command.decision == CONTROL_DECISION_DIRECT_GPIO)
+  {
+    /* The ISR leaves SWEN alone in direct mode; track its externally applied state. */
+    command.swen_output_request = swen_output_on;
+  }
+  else
+  {
+    bool swen_policy_request = false;
+    if (command.decision == CONTROL_DECISION_MANUAL_SET_ALGO)
+    {
+      swen_policy_request = command.swen_request;
+    }
+    else if ((command.decision == CONTROL_DECISION_CAN_ALGO) ||
+             (command.decision == CONTROL_DECISION_UART_ALGO))
+    {
+      swen_policy_request = command.swen_request && command.energy_swen_allowed;
+    }
+    command.swen_output_request = SwenMinOnOff1kHz(swen_policy_request, swen_output_on, now_ms);
+  }
 
   g_latest.p_set = command.p_set_w;
   publish_fast_command(&command);

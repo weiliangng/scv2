@@ -75,40 +75,6 @@ static inline uint16_t clamp_u12(int32_t v)
   return (uint16_t)v;
 }
 
-/*
- * SWEN min-ON/min-OFF limiter using DWT->CYCCNT (wrap-safe).
- *
- * NOTE: These timings assume a fixed CPU clock. If you change clocks, update CPU_HZ.
- */
-#define SWEN_MIN_ON_CYC ((SCAP_CPU_HZ / 1000u * SCAP_SWEN_MIN_ON_MS))
-#define SWEN_MIN_OFF_CYC ((SCAP_CPU_HZ / 1000u * SCAP_SWEN_MIN_OFF_MS))
-
-static inline uint8_t SwenMinOnOff(uint8_t req_on)
-{
-  const uint32_t now = DWT->CYCCNT;
-  static uint32_t t0;
-  static uint8_t out; /* 0=OFF, 1=ON */
-  const uint32_t dt = now - t0; /* wrap-safe */
-
-  if (out != 0u)
-  {
-    if ((req_on == 0u) && (dt >= (uint32_t)SWEN_MIN_ON_CYC))
-    {
-      out = 0u;
-      t0 = now;
-    }
-  }
-  else
-  {
-    if ((req_on != 0u) && (dt >= (uint32_t)SWEN_MIN_OFF_CYC))
-    {
-      out = 1u;
-      t0 = now;
-    }
-  }
-  return out;
-}
-
 static inline void gpio_write_masked_bsrr(GPIO_TypeDef *port, uint16_t affect_mask, uint16_t desired)
 {
   const uint16_t set_mask = (uint16_t)(desired & affect_mask);
@@ -379,7 +345,7 @@ void DMA1_Channel1_IRQHandler(void)
     }
     else
     {
-      uint8_t desired_swen = 0u;
+      uint8_t desired_swen = command.swen_output_request;
       uint16_t led_desired = 0u;
       const bool drives_algo = (command.decision == CONTROL_DECISION_MANUAL_SET_ALGO) ||
                                (command.decision == CONTROL_DECISION_CAN_ALGO) ||
@@ -407,20 +373,7 @@ void DMA1_Channel1_IRQHandler(void)
           const uint32_t idle_led_phase = (g_adc_seq_count / 25000u) & 1u; /* 1 Hz */
           led_desired = idle_led_phase != 0u ? GPIO_LED_Pin : 0u;
         }
-        else if (command.decision == CONTROL_DECISION_MANUAL_SET_ALGO)
-        {
-          desired_swen = command.swen_request ? 1u : 0u;
-        }
-        else
-        {
-          desired_swen = (command.swen_request && command.energy_swen_allowed) ? 1u : 0u;
-        }
-        desired_swen = SwenMinOnOff(desired_swen);
-        if ((command.decision != CONTROL_DECISION_IDLE) &&
-            (command.decision != CONTROL_DECISION_NO_SOURCE))
-        {
-          led_desired = desired_swen != 0u ? GPIO_LED_Pin : 0u;
-        }
+        else led_desired = command.swen_output_request != 0u ? GPIO_LED_Pin : 0u;
       }
       if (desired_swen != g_swen_last_applied)
       {
@@ -430,7 +383,7 @@ void DMA1_Channel1_IRQHandler(void)
       }
       gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin, led_desired);
     }
-    if (LL_GPIO_IsOutputPinSet(GPIOB, GPIO_SWEN_Pin) == 0u) g_latest.i_out = 0.0f;
+    if (LL_GPIO_IsOutputPinSet(GPIOB, GPIO_SWEN_Pin) == 0u) g_latest.i_out = 0.0f;//imonOP/N only valid when ON
   }
   else
   {
