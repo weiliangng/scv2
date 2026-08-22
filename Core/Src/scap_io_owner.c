@@ -98,11 +98,6 @@ void ScapIo_SetModeRequest(control_mode_request_t mode)
   CommandInputs_ResetPushbuttonForModeChange(HAL_GetTick());
 }
 
-control_mode_request_t ScapIo_GetModeRequest(void)
-{
-  return s_mode_request;
-}
-
 bool ScapIo_IsDirectMode(void)
 {
   return s_mode_request == CONTROL_MODE_DIRECT_GPIO;

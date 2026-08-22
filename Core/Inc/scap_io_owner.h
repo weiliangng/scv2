@@ -63,7 +63,6 @@ void ScapIo_ReadFastCommand(control_fast_command_t *command);
 const char *ScapIo_DecisionName(control_decision_t decision);
 
 void ScapIo_SetModeRequest(control_mode_request_t mode);
-control_mode_request_t ScapIo_GetModeRequest(void);
 bool ScapIo_IsDirectMode(void);
 void ScapIo_ReadStatus(control_status_t *status);
 

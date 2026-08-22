@@ -21,7 +21,6 @@ typedef struct
   float i_out_p;
   float i_out_n;
   float i_conv;
-  float p_load;
   float p_set;
 } latest_values_t;
 
@@ -32,7 +31,6 @@ extern volatile latest_values_t g_latest;
  */
 extern const float C_cap;
 extern const float V_cap_max;
-extern const float cap_lo;
 
 /*
  * ISR timing metrics (DWT CYCCNT cycles).

@@ -301,9 +301,6 @@ void DMA1_Channel1_IRQHandler(void)
     if (i_conv > i_limit) i_conv = i_limit;
     else if (i_conv < -i_limit) i_conv = -i_limit;
 
-    if (i_conv > I_CONV_CLAMP_ABS_A) i_conv = I_CONV_CLAMP_ABS_A;
-    else if (i_conv < -I_CONV_CLAMP_ABS_A) i_conv = -I_CONV_CLAMP_ABS_A;
-
     uint16_t n_dac_p = clamp_u12((int32_t)(A_INP + (i_conv * B_INP)));
     uint16_t n_dac_n = clamp_u12((int32_t)(A_INN + (i_conv * B_INN)));
 

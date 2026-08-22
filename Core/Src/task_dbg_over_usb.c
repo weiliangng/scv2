@@ -28,8 +28,6 @@
 #include "usbd_def.h"
 #include "stm32g4xx_hal.h"
 
-#include <stdarg.h>
-#include <stdio.h>
 #include <string.h>
 
 extern USBD_HandleTypeDef hUsbDeviceFS;
@@ -129,35 +127,6 @@ void dbg_write(const uint8_t *data, uint16_t len)
     len = (uint16_t)(len - sent);
     dbg_notify_tx_task();
   }
-}
-
-int dbg_printf(const char *fmt, ...)
-{
-  char tmp[128];
-  va_list ap;
-  int n;
-
-  if (fmt == NULL)
-  {
-    return 0;
-  }
-
-  va_start(ap, fmt);
-  n = vsnprintf(tmp, sizeof(tmp), fmt, ap);
-  va_end(ap);
-
-  if (n <= 0)
-  {
-    return n;
-  }
-
-  if (n >= (int)sizeof(tmp))
-  {
-    n = (int)sizeof(tmp) - 1;
-  }
-
-  dbg_write((const uint8_t *)tmp, (uint16_t)n);
-  return n;
 }
 
 bool dbg_try_write(const uint8_t *data, uint16_t len)
