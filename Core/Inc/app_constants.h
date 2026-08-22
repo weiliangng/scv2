@@ -37,7 +37,7 @@ extern float N_OFFSET;
 #define SCAP_UVLO_EXIT_V                (11.0f)
 #define SCAP_VCAP_MAX_V                 (26.3f)
 #define SCAP_VCAP_LOW_V                 (0.20f * SCAP_VCAP_MAX_V)
-#define SCAP_VCAP_HYSTERESIS_V          (0.2f)
+#define SCAP_VCAP_HYSTERESIS_V          (0.1f)
 #define SCAP_ENERGY_CHARGE_J            (50u)
 #define SCAP_ENERGY_DISCHARGE_J         (20u)
 #define SCAP_POWER_HYSTERESIS           (10.0f)
@@ -46,8 +46,8 @@ extern float N_OFFSET;
 #define SCAP_MANUAL_DEFAULT_POWER_W     (50.0f)
 #define SCAP_COMMAND_FRESH_TIMEOUT_MS   (300u)
 #define SCAP_FAULT_RECOVERY_MS          (500u)
-#define SCAP_SWEN_MIN_ON_MS             (100u)
-#define SCAP_SWEN_MIN_OFF_MS            (2u)
+#define SCAP_SWEN_MIN_ON_MS             (50u)
+#define SCAP_SWEN_MIN_OFF_MS            (1u)
 
 // DAC setting (real units -> counts)
 // N_dac_p = A_INP + I_conv * B_INP
