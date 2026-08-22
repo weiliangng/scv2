@@ -369,6 +369,10 @@ void ScapIo_Resolve1kHz(void)
     gpio_write_masked_bsrr(GPIOB, GPIO_MODEMSB_Pin | GPIO_MODELSB_Pin, GPIO_MODELSB_Pin);
   }
 
+  //manage capacitor derating here (might need to derate capacitor voltage as it fails)
+
+
+
   g_latest.p_set = command.p_set_w;
   publish_fast_command(&command);
 
