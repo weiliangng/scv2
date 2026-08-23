@@ -22,6 +22,7 @@ typedef struct
   float i_out_n;
   float i_conv;
   float p_set;
+  bool dir;
 } latest_values_t;
 
 extern volatile latest_values_t g_latest;

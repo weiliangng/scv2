@@ -83,6 +83,7 @@ static inline void gpio_write_masked_bsrr(GPIO_TypeDef *port, uint16_t affect_ma
 }
 
 static uint8_t g_swen_last_applied = 0xFFu; /* force first apply */
+static uint32_t dir_counter = 0;
 
 static uint8_t ScapSafety_FaultBits(float v_bus, float v_cap)
 {
@@ -301,13 +302,45 @@ void DMA1_Channel1_IRQHandler(void)
     if (i_conv > i_limit) i_conv = i_limit;
     else if (i_conv < -i_limit) i_conv = -i_limit;
 
+
+    //15 cycle constant DIR pin gate
+    //dir == high, then if current DIR = high, business as usual
+    //dir == high, else current DIR = low, transition required
+    // if counter == 10, transition then business as usual, reset counter to 0
+    // else block transition, set iconv close to 0, maintain DIR = low
+    if (dir_counter < SCAP_DIR_MIN_TRANSITION_ISR_CYCLES) dir_counter++;
+    const bool dir_current = (GPIO_DIR_GPIO_Port->ODR & GPIO_DIR_Pin);
+    bool dir_new = (i_conv > 0.0f);
+
+    if (dir_new == 1)//new dir is high
+    {
+      if (dir_current == 0)//current dir is low
+      {
+        if (dir_counter == SCAP_DIR_MIN_TRANSITION_ISR_CYCLES) dir_counter = 0;
+        else
+        {
+          dir_new = dir_current;
+          i_conv = 0.0f;
+        }
+      }
+    }
+    else //new dir == low/0
+    {
+      if (dir_current == 1)
+      {
+        if (dir_counter == SCAP_DIR_MIN_TRANSITION_ISR_CYCLES) dir_counter = 0;
+        else
+        {
+          dir_new = dir_current;
+          i_conv = 0.0f;
+        }
+      }
+    }
+
     uint16_t n_dac_p = clamp_u12((int32_t)(A_INP + (i_conv * B_INP)));
     uint16_t n_dac_n = clamp_u12((int32_t)(A_INN + (i_conv * B_INN)));
 
-    g_latest.v_bus = v_bus;
-    g_latest.v_cap = v_cap;
-    g_latest.i_load = i_load;
-    g_latest.i_conv = i_conv;
+
 
     if ((g_app_watchdog_failed != 0u) || fault_latched)
     {
@@ -319,7 +352,7 @@ void DMA1_Channel1_IRQHandler(void)
     }
     else if (uvlo_lockout)
     {
-      if (i_conv > 0.0f)
+      if (dir_new)
       {
         gpio_write_masked_bsrr(GPIOB, GPIO_DIR_Pin, GPIO_DIR_Pin);
         n_dac_n = n_dac_p;
@@ -352,7 +385,7 @@ void DMA1_Channel1_IRQHandler(void)
 
       if (drives_algo)
       {
-        if (i_conv > 0.0f)
+        if (dir_new)
         {
           gpio_write_masked_bsrr(GPIOB, GPIO_DIR_Pin, GPIO_DIR_Pin);
           n_dac_n = n_dac_p;
@@ -380,6 +413,12 @@ void DMA1_Channel1_IRQHandler(void)
       }
       gpio_write_masked_bsrr(GPIO_LED_GPIO_Port, GPIO_LED_Pin, led_desired);
     }
+
+    g_latest.v_bus = v_bus;
+    g_latest.v_cap = v_cap;
+    g_latest.i_load = i_load;
+    g_latest.i_conv = i_conv;
+    g_latest.dir = (GPIO_DIR_GPIO_Port->ODR & GPIO_DIR_Pin);
     if (LL_GPIO_IsOutputPinSet(GPIOB, GPIO_SWEN_Pin) == 0u) g_latest.i_out = 0.0f;//imonOP/N only valid when ON
   }
   else

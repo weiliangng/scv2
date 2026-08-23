@@ -48,6 +48,8 @@ extern float N_OFFSET;
 #define SCAP_FAULT_RECOVERY_MS          (500u)
 #define SCAP_SWEN_MIN_ON_MS             (50u)
 #define SCAP_SWEN_MIN_OFF_MS            (1u)
+#define SCAP_DIR_MIN_TRANSITION_INTERVAL_US  (200u)
+#define SCAP_DIR_MIN_TRANSITION_ISR_CYCLES   (10u)
 
 // DAC setting (real units -> counts)
 // N_dac_p = A_INP + I_conv * B_INP

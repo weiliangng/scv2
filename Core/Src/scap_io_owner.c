@@ -334,7 +334,7 @@ void ScapIo_Resolve1kHz(void)
     else
     {
       const float v_cap = g_latest.v_cap;
-      const float i_conv = g_latest.i_conv;
+      const bool dir = g_latest.dir;
 
       //add hysteresis around cap UVLO/cap burst mode emulation
       if (charge_vcap_lockout != 0u)
@@ -361,8 +361,8 @@ void ScapIo_Resolve1kHz(void)
         discharge_vcap_lockout = 1u;
       }
 
-      bool can_charge = ((charge_vcap_lockout == 0u) && (i_conv > 0.0f));
-      bool can_discharge = ((discharge_vcap_lockout == 0u) && (i_conv < 0.0f));
+      bool can_charge = ((charge_vcap_lockout == 0u) && (dir));
+      bool can_discharge = ((discharge_vcap_lockout == 0u) && (!dir));
 
       energy_swen_allowed = can_charge || can_discharge;
 
