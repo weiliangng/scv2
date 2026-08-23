@@ -270,7 +270,10 @@ void DMA1_Channel1_IRQHandler(void)
     const float i_out = (i_out_p > -i_out_n) ? i_out_p : i_out_n;
     g_latest.i_out_p = i_out_p;
     g_latest.i_out_n = i_out_n;
-    g_latest.i_out = i_out;
+
+    if (LL_GPIO_IsOutputPinSet(GPIOB, GPIO_SWEN_Pin) == 0u) g_latest.i_out = 0.0f;//imonOP/N only valid when ON
+    else g_latest.i_out = i_out;
+
 
 
     const float v_bus = (A_VBUS * (float)n_adc_vbus) + B_VBUS;
@@ -281,6 +284,9 @@ void DMA1_Channel1_IRQHandler(void)
     const uint8_t safety_state = ScapIo_FastUpdateSafety(fault_bits, v_bus); //vbus for UVLO
     const bool fault_latched = (safety_state & SCAP_FAST_SAFETY_FAULT_LATCHED) != 0u;
     const bool uvlo_lockout = (safety_state & SCAP_FAST_SAFETY_UVLO_LOCKOUT) != 0u;
+
+
+    g_cap_energy_delta += g_latest.i_out * v_cap * 1/50000;
 
     // ADC2 (see `shared_state.h`): [0]=ILOAD differential (offset-binary)
     const uint16_t n_adc_iload = g_adc2_dma_buf[0] & 0x0FFFU;
@@ -419,7 +425,6 @@ void DMA1_Channel1_IRQHandler(void)
     g_latest.i_load = i_load;
     g_latest.i_conv = i_conv;
     g_latest.dir = (GPIO_DIR_GPIO_Port->ODR & GPIO_DIR_Pin);
-    if (LL_GPIO_IsOutputPinSet(GPIOB, GPIO_SWEN_Pin) == 0u) g_latest.i_out = 0.0f;//imonOP/N only valid when ON
   }
   else
   {

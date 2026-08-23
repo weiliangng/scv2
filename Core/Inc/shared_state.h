@@ -60,6 +60,7 @@ extern volatile bool g_is_safe;
  */
 extern volatile uint32_t g_adc_seq_hz;
 extern volatile uint32_t g_telemetry_seq;
+extern volatile float g_cap_energy_delta;
 
 /*
  * ADC DMA buffers updated by hardware/DMA and consumed in ISR/task contexts.
