@@ -198,11 +198,11 @@ USART1 emits one CSV record every 10 ms from boot at 921600 baud, 8-N-1. The USB
 | 65 | `cap_bad_windows` | continuous, 0..3 | Current consecutive bad-window count; reset after a derate or a good window. |
 | 66 | `cap_derates` | continuous, uint8 | Number of 0.1 V runtime derates since boot. |
 | 67 | `cap_dE_mJ_min` | continuous, signed mJ/min | Integrated energy change measured over the last completed one-minute health window. |
-| 68 | `cap_dV_mV_min` | continuous, signed mV/min | Vcap change measured over the last completed one-minute health window. |
+| 68 | `cap_dV_mV_min` | continuous, signed mV/min | Vcap trend from averaged endpoints of the last completed one-minute health window. |
 
 `cap_energy_mJ` starts at zero. The 50 kHz ADC ISR integrates signed `Vcap * Iout` energy into 50-sample (1 ms) blocks; the 1 kHz task transfers completed blocks into the signed run-long counter while retaining fractional mJ. `Iout` is forced to zero while SWEN is off. On each upward crossing of 23.0 V the counter is rebased to 1,322,500 mJ, the ideal stored energy of a 5 F capacitor at 23.0 V. The anchor re-arms after Vcap falls to 22.9 V or below.
 
-The capacitor-health check compares energy and voltage across non-overlapping one-minute windows. A window is bad when energy rises by at least 500,000 mJ while Vcap rises by less than 100 mV. Three consecutive bad windows latch `cap_unhealthy`, reduce the runtime Vcap maximum by 0.1 V, and restart the count. Repeated groups of three bad windows continue derating down to a 23.0 V floor. The maximum, latch, and counters reset on reboot; the fixed 30 V hardware-safety threshold is unchanged.
+The capacitor-health check compares energy and voltage across non-overlapping one-minute windows. Its voltage trend compares the average Vcap from the first 10 seconds with the average from the last 10 seconds, normalized to mV/min; raw Vcap remains in use for the 23 V anchor and control thresholds. A window is bad when energy rises by at least 500,000 mJ while the averaged Vcap trend is less than 100 mV/min. Three consecutive bad windows latch `cap_unhealthy`, reduce the runtime Vcap maximum by 0.1 V, and restart the count. Repeated groups of three bad windows continue derating down to a 23.0 V floor. The maximum, latch, and counters reset on reboot; the fixed 30 V hardware-safety threshold is unchanged.
 
 ### Control precedence
 

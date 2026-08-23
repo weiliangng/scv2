@@ -15,8 +15,14 @@ static bool s_anchor_armed;
 static bool s_window_initialized;
 static uint32_t s_window_start_ms;
 static int32_t s_window_start_energy_mj;
-static int32_t s_window_start_vcap_mv;
+static int64_t s_window_start_vcap_sum_mv;
+static uint32_t s_window_start_vcap_samples;
+static int64_t s_window_end_vcap_sum_mv;
+static uint32_t s_window_end_vcap_samples;
 static capacitor_monitor_status_t s_status;
+
+_Static_assert(SCAP_CAP_HEALTH_VOLTAGE_AVG_MS < (SCAP_CAP_HEALTH_WINDOW_MS / 2u),
+               "Health voltage averaging intervals must not overlap");
 
 static float take_pending_energy_mj(void)
 {
@@ -44,12 +50,25 @@ static void reset_energy_pipeline(void)
   }
 }
 
-static void reset_health_window(uint32_t now_ms, float v_cap)
+static int32_t vcap_to_mv(float v_cap)
+{
+  return (int32_t)((v_cap * 1000.0f) + ((v_cap >= 0.0f) ? 0.5f : -0.5f));
+}
+
+static void begin_health_window(uint32_t now_ms, float v_cap)
 {
   s_window_initialized = true;
   s_window_start_ms = now_ms;
   s_window_start_energy_mj = g_cap_energy_mj;
-  s_window_start_vcap_mv = (int32_t)(v_cap * 1000.0f);
+  s_window_start_vcap_sum_mv = vcap_to_mv(v_cap);
+  s_window_start_vcap_samples = 1u;
+  s_window_end_vcap_sum_mv = 0;
+  s_window_end_vcap_samples = 0u;
+}
+
+static void reset_health_window(uint32_t now_ms, float v_cap)
+{
+  begin_health_window(now_ms, v_cap);
   s_status.bad_window_count = 0u;
 }
 
@@ -63,7 +82,10 @@ void CapacitorMonitor_Init(void)
   s_window_initialized = false;
   s_window_start_ms = 0u;
   s_window_start_energy_mj = 0;
-  s_window_start_vcap_mv = 0;
+  s_window_start_vcap_sum_mv = 0;
+  s_window_start_vcap_samples = 0u;
+  s_window_end_vcap_sum_mv = 0;
+  s_window_end_vcap_samples = 0u;
   s_status.vcap_max_v = SCAP_VCAP_MAX_V;
   s_status.last_energy_gain_mj = 0;
   s_status.last_vcap_gain_mv = 0;
@@ -121,14 +143,56 @@ void CapacitorMonitor_Update1kHz(uint32_t now_ms, float v_cap)
     reset_health_window(now_ms, v_cap);
     return;
   }
-  if (anchored || ((uint32_t)(now_ms - s_window_start_ms) < SCAP_CAP_HEALTH_WINDOW_MS))
+  if (anchored)
   {
     return;
   }
 
-  const int32_t vcap_mv = (int32_t)(v_cap * 1000.0f);
+  const uint32_t window_elapsed_ms = (uint32_t)(now_ms - s_window_start_ms);
+  if (window_elapsed_ms < SCAP_CAP_HEALTH_WINDOW_MS)
+  {
+    const int32_t vcap_mv = vcap_to_mv(v_cap);
+    if (window_elapsed_ms < SCAP_CAP_HEALTH_VOLTAGE_AVG_MS)
+    {
+      s_window_start_vcap_sum_mv += vcap_mv;
+      s_window_start_vcap_samples++;
+    }
+    else if (window_elapsed_ms >=
+             (SCAP_CAP_HEALTH_WINDOW_MS - SCAP_CAP_HEALTH_VOLTAGE_AVG_MS))
+    {
+      s_window_end_vcap_sum_mv += vcap_mv;
+      s_window_end_vcap_samples++;
+    }
+    return;
+  }
+
+  if ((s_window_start_vcap_samples == 0u) || (s_window_end_vcap_samples == 0u))
+  {
+    s_status.bad_window_count = 0u;
+    begin_health_window(now_ms, v_cap);
+    return;
+  }
+
+  const int32_t start_vcap_avg_mv =
+      (int32_t)(s_window_start_vcap_sum_mv / (int64_t)s_window_start_vcap_samples);
+  const int32_t end_vcap_avg_mv =
+      (int32_t)(s_window_end_vcap_sum_mv / (int64_t)s_window_end_vcap_samples);
+  const int64_t endpoint_gain_mv = (int64_t)end_vcap_avg_mv - start_vcap_avg_mv;
+  const int64_t endpoint_separation_ms =
+      SCAP_CAP_HEALTH_WINDOW_MS - SCAP_CAP_HEALTH_VOLTAGE_AVG_MS;
+  int64_t normalized_gain_numerator = endpoint_gain_mv * SCAP_CAP_HEALTH_WINDOW_MS;
+  if (normalized_gain_numerator >= 0)
+  {
+    normalized_gain_numerator += endpoint_separation_ms / 2;
+  }
+  else
+  {
+    normalized_gain_numerator -= endpoint_separation_ms / 2;
+  }
+
   const int32_t energy_gain_mj = g_cap_energy_mj - s_window_start_energy_mj;
-  const int32_t vcap_gain_mv = vcap_mv - s_window_start_vcap_mv;
+  const int32_t vcap_gain_mv =
+      (int32_t)(normalized_gain_numerator / endpoint_separation_ms);
   s_status.last_energy_gain_mj = energy_gain_mj;
   s_status.last_vcap_gain_mv = vcap_gain_mv;
 
@@ -164,9 +228,7 @@ void CapacitorMonitor_Update1kHz(uint32_t now_ms, float v_cap)
     s_status.bad_window_count = 0u;
   }
 
-  s_window_start_ms = now_ms;
-  s_window_start_energy_mj = g_cap_energy_mj;
-  s_window_start_vcap_mv = vcap_mv;
+  begin_health_window(now_ms, v_cap);
 }
 
 float CapacitorMonitor_GetVcapMaxV(void)
