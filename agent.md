@@ -192,7 +192,9 @@ USART1 emits one CSV record every 10 ms from boot at 921600 baud, 8-N-1. The USB
 | 59 | `man_swen_valid` | binary | Manual SWEN has been set by the CLI since boot. |
 | 60 | `btn_swen` | binary | Debounced pushbutton SWEN mailbox request; it does not expire. |
 | 61 | `btn_swen_valid` | binary | Pushbutton SWEN mailbox set since boot or reset by a mode transition. |
-| 62 | `cap_net_mJ` | continuous, signed mJ | Net capacitor energy accumulated since boot; charging adds and discharging subtracts. |
+| 62 | `cap_energy_mJ` | continuous, signed mJ | Integrated capacitor energy; charging adds and discharging subtracts. |
+
+`cap_energy_mJ` starts at zero. On each upward crossing of 23.0 V it is rebased to 1,322,500 mJ, the ideal stored energy of a 5 F capacitor at 23.0 V. The anchor re-arms after Vcap falls to 22.9 V or below.
 
 ### Control precedence
 

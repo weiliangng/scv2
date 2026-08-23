@@ -428,7 +428,7 @@ static void usbcli_cmd_status(void)
   usbcli_printf("  Load current (average): %ld mA\r\n", (long)i_load_avg_mA);
   usbcli_printf("  Output current (average): %ld mA\r\n", (long)i_out_avg_mA);
   usbcli_printf("  Converter current command (I_conv) (average): %ld mA\r\n", (long)i_conv_avg_mA);
-  usbcli_printf("  Net capacitor energy since boot: %s%lu.%03lu J\r\n",
+  usbcli_printf("  Integrated capacitor energy: %s%lu.%03lu J\r\n",
                 cap_energy_mj < 0 ? "-" : "",
                 (unsigned long)(cap_energy_abs_mj / 1000u),
                 (unsigned long)(cap_energy_abs_mj % 1000u));

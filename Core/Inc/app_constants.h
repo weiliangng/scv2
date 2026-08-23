@@ -51,6 +51,11 @@ extern float N_OFFSET;
 #define SCAP_DIR_MIN_TRANSITION_INTERVAL_US  (200u)
 #define SCAP_DIR_MIN_TRANSITION_ISR_CYCLES   (10u)
 #define SCAP_ADC_ISR_INTERVAL_S              (1.0f / 50000.0f)
+#define SCAP_ENERGY_ESTIMATED_CAPACITANCE_F  (5.0f)
+#define SCAP_ENERGY_ANCHOR_V                  (23.0f)
+#define SCAP_ENERGY_ANCHOR_REARM_V            (22.9f)
+#define SCAP_ENERGY_ANCHOR_VALUE_MJ \
+  (0.5f * SCAP_ENERGY_ESTIMATED_CAPACITANCE_F * SCAP_ENERGY_ANCHOR_V * SCAP_ENERGY_ANCHOR_V * 1000.0f)
 
 // DAC setting (real units -> counts)
 // N_dac_p = A_INP + I_conv * B_INP

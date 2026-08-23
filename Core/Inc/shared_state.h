@@ -60,7 +60,7 @@ extern volatile bool g_is_safe;
  */
 extern volatile uint32_t g_adc_seq_hz;
 extern volatile uint32_t g_telemetry_seq;
-/* Signed net capacitor energy since boot: charge adds, discharge subtracts. */
+/* Integrated capacitor energy, rebased from Vcap at a known voltage anchor. */
 extern volatile int32_t g_cap_energy_mj;
 
 /*

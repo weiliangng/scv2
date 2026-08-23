@@ -85,6 +85,8 @@ static inline void gpio_write_masked_bsrr(GPIO_TypeDef *port, uint16_t affect_ma
 static uint8_t g_swen_last_applied = 0xFFu; /* force first apply */
 static uint32_t dir_counter = 0;
 static float cap_energy_remainder_mj;
+static bool cap_energy_anchor_initialized;
+static bool cap_energy_anchor_armed;
 
 static uint8_t ScapSafety_FaultBits(float v_bus, float v_cap)
 {
@@ -286,7 +288,26 @@ void DMA1_Channel1_IRQHandler(void)
     const bool fault_latched = (safety_state & SCAP_FAST_SAFETY_FAULT_LATCHED) != 0u;
     const bool uvlo_lockout = (safety_state & SCAP_FAST_SAFETY_UVLO_LOCKOUT) != 0u;
 
-    if (g_latest.i_conv != 0.0f)
+    bool cap_energy_anchored = false;
+    if (!cap_energy_anchor_initialized)
+    {
+      cap_energy_anchor_armed = v_cap < SCAP_ENERGY_ANCHOR_V;
+      cap_energy_anchor_initialized = true;
+    }
+    else if (!cap_energy_anchor_armed && (v_cap <= SCAP_ENERGY_ANCHOR_REARM_V))
+    {
+      cap_energy_anchor_armed = true;
+    }
+
+    if (cap_energy_anchor_armed && (v_cap >= SCAP_ENERGY_ANCHOR_V))
+    {
+      g_cap_energy_mj = (int32_t)(SCAP_ENERGY_ANCHOR_VALUE_MJ + 0.5f);
+      cap_energy_remainder_mj = 0.0f;
+      cap_energy_anchor_armed = false;
+      cap_energy_anchored = true;
+    }
+
+    if (!cap_energy_anchored && (g_latest.i_conv != 0.0f))
     {
       cap_energy_remainder_mj += g_latest.i_out * v_cap * SCAP_ADC_ISR_INTERVAL_S * 1000.0f;
       const int32_t whole_mj = (int32_t)cap_energy_remainder_mj;
