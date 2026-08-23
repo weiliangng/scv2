@@ -39,9 +39,9 @@ add_executable(${CMAKE_PROJECT_NAME}
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
-# The 50 kHz ADC1 DMA ISR is latency-critical; leave all other sources at the
-# selected preset's optimization level.
-set_source_files_properties(Core/Src/stm32g4xx_it.c PROPERTIES COMPILE_OPTIONS "-O2")
+# The 50 kHz ADC1 DMA ISR and its energy helper are latency-critical; leave all
+# other sources at the selected preset's optimization level.
+set_source_files_properties(Core/Src/stm32g4xx_it.c Core/Src/capacitor_monitor.c PROPERTIES COMPILE_OPTIONS "-O2")
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -52,6 +52,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Core/Src/shared_state.c
+    Core/Src/capacitor_monitor.c
     Core/Src/command_inputs.c
     Core/Src/can_protocol.c
     Core/Src/app_constants.c

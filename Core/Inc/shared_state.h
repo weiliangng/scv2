@@ -31,7 +31,6 @@ extern volatile latest_values_t g_latest;
  * Supercap state/telemetry constants.
  */
 extern const float C_cap;
-extern const float V_cap_max;
 
 /*
  * ISR timing metrics (DWT CYCCNT cycles).

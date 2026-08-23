@@ -7,7 +7,6 @@ volatile latest_values_t g_latest = {
 };
 
 const float C_cap = 1822.5f;
-const float V_cap_max = SCAP_VCAP_MAX_V;
 
 volatile uint32_t g_dma1_ch1_irq_cycles_last;
 volatile uint32_t g_dma1_ch1_irq_cycles_max;

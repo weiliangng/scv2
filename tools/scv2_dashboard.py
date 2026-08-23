@@ -61,6 +61,10 @@ FIELDS = (
     Field("man_p_valid", "Manual power valid"), Field("man_swen", "Manual SWEN"),
     Field("man_swen_valid", "Manual SWEN valid"), Field("btn_swen", "Button SWEN"),
     Field("btn_swen_valid", "Button SWEN valid"), Field("cap_energy_mJ", "Integrated capacitor energy", "mJ"),
+    Field("vcap_max_mV", "Runtime Vcap maximum", "mV"),
+    Field("cap_unhealthy", "Capacitor health"), Field("cap_bad_windows", "Bad minute streak"),
+    Field("cap_derates", "Voltage derates"), Field("cap_dE_mJ_min", "Last energy gain", "mJ/min"),
+    Field("cap_dV_mV_min", "Last voltage gain", "mV/min"),
 )
 FIELD_BY_NAME = {field.name: field for field in FIELDS}
 
@@ -77,7 +81,7 @@ TEXT = {
     "uart_swen_req": ("OFF", "ON"), "man_swen": ("OFF", "ON"),
     "btn_swen": ("OFF", "ON"), "safe": ("UNSAFE", "SAFE"),
     "uvlo": ("CLEAR", "LOCKOUT"), "fault_latched": ("CLEAR", "LATCHED"),
-    "can_bus": ("DOWN", "UP"),
+    "can_bus": ("DOWN", "UP"), "cap_unhealthy": ("HEALTHY", "UNHEALTHY"),
 }
 for _name in ("can_p_valid", "can_e_valid", "can_swen_valid", "uart_p_valid", "uart_e_valid",
               "man_p_valid", "man_swen_valid", "btn_swen_valid"):
@@ -118,6 +122,8 @@ def demo_sample(sequence: int) -> dict[str, int]:
         "fault_bits": 0, "can_bus": 1, "can_p": 80, "can_p_valid": 1, "can_p_fresh": 1,
         "can_e": 40, "can_e_valid": 1, "can_e_fresh": 1, "can_swen": 1, "can_swen_valid": 1,
         "can_swen_fresh": 1, "cap_energy_mJ": int(5_000_000 * math.sin(t / 10)),
+        "vcap_max_mV": 26200, "cap_unhealthy": 0, "cap_bad_windows": 2,
+        "cap_derates": 1, "cap_dE_mJ_min": 550000, "cap_dV_mV_min": 50,
     })
     return sample
 
@@ -386,14 +392,15 @@ class Dashboard(QtWidgets.QMainWindow):
         layout.addWidget(self._value_grid("Raw ADC values", ["adc_vcap", "adc_vbus", "adc_iload", "adc_iop", "adc_ion"]), 0, 1)
         layout.addWidget(self._value_grid("DAC values", ["dac1_ch1", "dac1_ch2", "dac3_ch1", "dac3_ch2"]), 1, 0)
         layout.addWidget(self._value_grid("Command values", ["can_p", "can_e", "uart_p", "uart_e", "man_p"]), 1, 1)
-        layout.addWidget(self._value_grid("Telemetry and diagnostics", ["seq", "adc_hz", "usb_drop", "dma_last", "dma_max", "fault_healthy_ms"]), 2, 0, 1, 2)
+        layout.addWidget(self._value_grid("Capacitor health", ["vcap_max_mV", "cap_bad_windows", "cap_derates", "cap_dE_mJ_min", "cap_dV_mV_min"]), 2, 0)
+        layout.addWidget(self._value_grid("Telemetry and diagnostics", ["seq", "adc_hz", "usb_drop", "dma_last", "dma_max", "fault_healthy_ms"]), 2, 1)
         return page
 
     def _status_page(self) -> QtWidgets.QWidget:
         page = QtWidgets.QWidget()
         states = QtWidgets.QGridLayout(page)
         states.addWidget(self._card_grid("Physical I/O", ["btn_in", "dir_out", "swen_out", "mode_out", "rvsoff_out", "nsil_out", "led_out"]), 0, 0)
-        states.addWidget(self._card_grid("Control and safety", ["mode_req", "decision", "swen_req", "safe", "uvlo", "fault_latched", "fault_bits"]), 0, 1)
+        states.addWidget(self._card_grid("Control and safety", ["mode_req", "decision", "swen_req", "safe", "uvlo", "fault_latched", "fault_bits", "cap_unhealthy"]), 0, 1)
         states.addWidget(self._card_grid("CAN", ["can_bus", "can_p_valid", "can_p_fresh", "can_e_valid", "can_e_fresh", "can_e_disabled", "can_swen", "can_swen_valid", "can_swen_fresh"]), 1, 0)
         states.addWidget(self._card_grid("UART and manual", ["uart_p_valid", "uart_p_fresh", "uart_e_valid", "uart_e_fresh", "uart_swen_req", "man_p_valid", "man_swen", "man_swen_valid", "btn_swen", "btn_swen_valid"]), 1, 1)
         return page
@@ -547,6 +554,12 @@ class Dashboard(QtWidgets.QMainWindow):
             if name == "cap_energy_mJ":
                 card.set_state(f"{sample[name] / 1000.0:,.3f} J", "blue")
                 continue
+            if name == "vcap_max_mV":
+                card.set_state(f"{sample[name] / 1000.0:,.3f} V", "blue")
+                continue
+            if name == "cap_dE_mJ_min":
+                card.set_state(f"{sample[name] / 1000.0:,.3f} J/min", "blue")
+                continue
             if name in VALIDITY_FIELD:
                 text, state = status_text_and_state(name, sample)
                 card.set_state(text, state)
@@ -591,7 +604,7 @@ def status_text_and_state(name: str, sample: dict[str, int]) -> tuple[str, str]:
         text = on if value else off
         if name in {"safe"}:
             return text, "green" if value else "red"
-        if name in {"uvlo", "fault_latched"}:
+        if name in {"uvlo", "fault_latched", "cap_unhealthy"}:
             return text, "red" if value else "green"
         if name.endswith("_valid") or name.endswith("_fresh"):
             return text, "green" if value else "grey"
@@ -614,6 +627,7 @@ def self_test() -> None:
     assert parse_t1("CLI ready") is None
     assert status_text_and_state("decision", parsed) == ("CAN", "green")
     assert status_text_and_state("can_p", {**parsed, "can_p_valid": 0}) == ("INVALID", "grey")
+    assert status_text_and_state("cap_unhealthy", {**parsed, "cap_unhealthy": 1}) == ("UNHEALTHY", "red")
     stream = NewlineStreamParser()
     assert stream.feed(b"CLI ready\nT1,1") == [b"CLI ready"]
     assert stream.feed(b",2\r\nlast") == [b"T1,1,2\r"]

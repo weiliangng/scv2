@@ -4,6 +4,7 @@
 
 #include "app_constants.h"
 #include "can_protocol.h"
+#include "capacitor_monitor.h"
 #include "command_inputs.h"
 #include "shared_state.h"
 
@@ -334,29 +335,33 @@ void ScapIo_Resolve1kHz(void)
     else
     {
       const float v_cap = g_latest.v_cap;
+      const float v_cap_max = CapacitorMonitor_GetVcapMaxV();
+      const float v_cap_low = SCAP_VCAP_LOW_RATIO * v_cap_max;
+      const float charge_resume_v = v_cap_max - SCAP_VCAP_HYSTERESIS_V;
+      const float discharge_resume_v = v_cap_low + SCAP_VCAP_HYSTERESIS_V;
       const bool dir = g_latest.dir;
 
       //add hysteresis around cap UVLO/cap burst mode emulation
       if (charge_vcap_lockout != 0u)
       {
-        if (v_cap <= SCAP_CHARGE_LOCKOUT_RESUME_V)
+        if (v_cap <= charge_resume_v)
         {
           charge_vcap_lockout = 0u;
         }
       }
-      else if (v_cap >= SCAP_VCAP_MAX_V)
+      else if (v_cap >= v_cap_max)
       {
         charge_vcap_lockout = 1u;
       }
 
       if (discharge_vcap_lockout != 0u)
       {
-        if (v_cap >= SCAP_DISCHARGE_LOCKOUT_RESUME_V)
+        if (v_cap >= discharge_resume_v)
         {
           discharge_vcap_lockout = 0u;
         }
       }
-      else if (v_cap <= SCAP_VCAP_LOW_V)
+      else if (v_cap <= v_cap_low)
       {
         discharge_vcap_lockout = 1u;
       }
@@ -390,7 +395,6 @@ void ScapIo_Resolve1kHz(void)
     gpio_write_masked_bsrr(GPIOB, GPIO_MODEMSB_Pin | GPIO_MODELSB_Pin, GPIO_MODELSB_Pin);
   }
 
-  //manage capacitor derating here (might need to derate capacitor voltage as it fails)
   const bool swen_output_on = SwenObserveOutput(now_ms);
   if ((command.decision == CONTROL_DECISION_DISABLE) || uvlo_lockout ||
       (command.decision == CONTROL_DECISION_MEASURE))

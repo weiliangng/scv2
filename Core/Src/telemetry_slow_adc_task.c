@@ -15,6 +15,7 @@
 #include "app_constants.h"
 #include "app_watchdog.h"
 #include "can_protocol.h"
+#include "capacitor_monitor.h"
 #include "shared_state.h"
 #include "scap_io_owner.h"
 
@@ -94,10 +95,10 @@ void TelemetrySlowAdcTask_Run(void const *argument)
 
   for (;;)
   {
-    ScapIo_Resolve1kHz();
     const float v_cap = g_latest.v_cap;
-
     const uint32_t now_ms = HAL_GetTick();
+    CapacitorMonitor_Update1kHz(now_ms, v_cap);
+    ScapIo_Resolve1kHz();
     if ((uint32_t)(now_ms - last_can_bus_poll_ms) >= CAN_BUS_ACTIVITY_POLL_MS)
     {
       last_can_bus_poll_ms = now_ms;
@@ -116,12 +117,17 @@ void TelemetrySlowAdcTask_Run(void const *argument)
       const int16_t i_load_10mA = clamp_i16((int32_t)((i_load * 100.0f) + ((i_load >= 0.0f) ? 0.5f : -0.5f)));
       const int16_t i_conv_10mA = clamp_i16((int32_t)((i_conv * 100.0f) + ((i_conv >= 0.0f) ? 0.5f : -0.5f)));
 
-      const float e_cap_max = 0.5f * C_cap * V_cap_max * V_cap_max;
+      const float v_cap_max = CapacitorMonitor_GetVcapMaxV();
+      const float e_cap_max = 0.5f * C_cap * v_cap_max * v_cap_max;
       const float e_now = 0.5f * C_cap * v_cap * v_cap;
       float capacity_pct_f = 0.0f;
       if (e_cap_max > 0.0f)
       {
         capacity_pct_f = (e_now / e_cap_max) * 100.0f;
+      }
+      if (capacity_pct_f > 100.0f)
+      {
+        capacity_pct_f = 100.0f;
       }
       uint8_t capacity_pct = clamp_u8((int32_t)(capacity_pct_f + 0.5f));
 

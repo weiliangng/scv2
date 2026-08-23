@@ -30,6 +30,7 @@
 #include "usb_cli.h"
 #include "app_constants.h"
 #include "can_protocol.h"
+#include "capacitor_monitor.h"
 #include "command_inputs.h"
 #include "shared_state.h"
 #include "telemetry_uart.h"
@@ -201,6 +202,7 @@ int main(void)
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   AppWatchdog_Init(&hiwdg);
+  CapacitorMonitor_Init();
   ScapIo_Init();
   CycleCountWatchdog_Init();
   DbgUsb_Init();
@@ -1275,11 +1277,13 @@ void StartTelemetryTask(void const * argument)
     manual_command_state_t manual_command;
     pushbutton_command_state_t pushbutton_command;
     control_status_t control_status;
+    capacitor_monitor_status_t cap_monitor_status;
     CanProtocol_ReadCommandSnapshot(&can_command);
     CommandInputs_ReadUartSnapshot(&uart_command);
     CommandInputs_ReadManualSnapshot(&manual_command);
     CommandInputs_ReadPushbuttonSnapshot(&pushbutton_command);
     ScapIo_ReadStatus(&control_status);
+    CapacitorMonitor_ReadStatus(&cap_monitor_status);
     DbgUsbStats dbg_stats;
     DbgUsb_GetStats(&dbg_stats);
 
@@ -1295,6 +1299,7 @@ void StartTelemetryTask(void const * argument)
     const int32_t i_out_mA = (int32_t)(i_out * 1000.0f);
     const int32_t i_conv_mA = (int32_t)(i_conv * 1000.0f);
     const int32_t pset_w = (int32_t)g_latest.p_set;
+    const int32_t vcap_max_mV = (int32_t)(cap_monitor_status.vcap_max_v * 1000.0f + 0.5f);
     const uint32_t swen_out = HAL_GPIO_ReadPin(GPIOB, GPIO_SWEN_Pin) != GPIO_PIN_RESET ? 1u : 0u;
     const uint32_t dir_out = HAL_GPIO_ReadPin(GPIOB, GPIO_DIR_Pin) != GPIO_PIN_RESET ? 1u : 0u;
     const uint32_t mode_out =
@@ -1310,7 +1315,7 @@ void StartTelemetryTask(void const * argument)
     const uint32_t dac3_ch2 = HAL_DAC_GetValue(&hdac3, DAC_CHANNEL_2) & 0x0FFFu;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "T1,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%ld\r\n",
+                       "T1,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%ld,%ld,%u,%u,%u,%ld,%ld\r\n",
                        (unsigned long)hello_seq++,
                        (unsigned long)adc_seq_hz,
                        (unsigned long)dbg_stats.telemetry_records_dropped,
@@ -1372,7 +1377,13 @@ void StartTelemetryTask(void const * argument)
                        manual_command.swen.present ? 1u : 0u,
                        pushbutton_command.swen.value ? 1u : 0u,
                        pushbutton_command.swen.present ? 1u : 0u,
-                       (long)cap_energy_mj);
+                       (long)cap_energy_mj,
+                       (long)vcap_max_mV,
+                       cap_monitor_status.unhealthy_latched ? 1u : 0u,
+                       (unsigned)cap_monitor_status.bad_window_count,
+                       (unsigned)cap_monitor_status.derate_count,
+                       (long)cap_monitor_status.last_energy_gain_mj,
+                       (long)cap_monitor_status.last_vcap_gain_mv);
     if (len > 0)
     {
       size_t msg_len = (size_t)len;

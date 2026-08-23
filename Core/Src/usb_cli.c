@@ -11,6 +11,7 @@
 
 #include "main.h"
 #include "app_constants.h"
+#include "capacitor_monitor.h"
 #include "can_protocol.h"
 #include "command_inputs.h"
 #include "scap_io_owner.h"
@@ -360,6 +361,8 @@ static void usbcli_cmd_status(void)
   const uint32_t adc_seq_hz = g_adc_seq_hz;
   control_status_t control_status;
   ScapIo_ReadStatus(&control_status);
+  capacitor_monitor_status_t cap_monitor_status;
+  CapacitorMonitor_ReadStatus(&cap_monitor_status);
   can_command_state_t can_command;
   uart_command_state_t uart_command;
   manual_command_state_t manual_command;
@@ -432,6 +435,15 @@ static void usbcli_cmd_status(void)
                 cap_energy_mj < 0 ? "-" : "",
                 (unsigned long)(cap_energy_abs_mj / 1000u),
                 (unsigned long)(cap_energy_abs_mj % 1000u));
+  usbcli_printf("  Runtime capacitor maximum: %ld mV\r\n",
+                (long)(cap_monitor_status.vcap_max_v * 1000.0f + 0.5f));
+  usbcli_printf("  Capacitor unhealthy/streak/derates: %u/%u/%u\r\n",
+                cap_monitor_status.unhealthy_latched ? 1u : 0u,
+                (unsigned)cap_monitor_status.bad_window_count,
+                (unsigned)cap_monitor_status.derate_count);
+  usbcli_printf("  Last capacitor health window energy/voltage gain: %ld mJ / %ld mV\r\n",
+                (long)cap_monitor_status.last_energy_gain_mj,
+                (long)cap_monitor_status.last_vcap_gain_mv);
 
   usbcli_printf("  Power setpoint: %ld W\r\n", (long)g_latest.p_set);
 

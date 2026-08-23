@@ -98,9 +98,9 @@ The 1 kHz resolver publishes a double-buffered fast command, and the ADC ISR app
 2. Vbus UVLO enters at `<=10 V`, exits at `>=11 V`, and forces SWEN off.
 3. Direct mode leaves normal power-stage output ownership to direct writes; measure mode forces SWEN off; manual mode uses manual inputs; external mode selects fresh UART power+energy before fresh CAN.
 4. CAN and UART fields are fresh for 300 ms. No fresh external source produces `no-source`, zero power, and a false SWEN policy request.
-5. Outside direct, measure, fault, and UVLO handling, SWEN observes a 100 ms minimum-on time and a 2 ms minimum-off time.
+5. Outside direct, measure, fault, and UVLO handling, SWEN observes a 50 ms minimum-on time and a 1 ms minimum-off time.
 
-For enabled external commands with valid energy, SWEN permission is based on converter direction and Vcap lockout, not on crossing an energy threshold. Charging is allowed only while `i_conv > 0` and Vcap is below the 26.3 V charge lockout; it resumes at `<=26.1 V`. Discharging is allowed only while `i_conv < 0` and Vcap is above the 5.26 V discharge lockout; it resumes at `>=5.46 V`. A zero converter-current command allows neither direction.
+For enabled external commands with valid energy, SWEN permission is based on converter direction and Vcap lockout, not on crossing an energy threshold. The initial runtime maximum is 26.3 V. Charging is allowed only while `i_conv > 0` and Vcap is below that maximum; it resumes at 0.1 V below the current maximum. The discharge lockout is 20% of the current maximum and resumes 0.1 V above that level. Initially these thresholds are 26.3/26.2 V for charge and 5.26/5.36 V for discharge. A zero converter-current command allows neither direction.
 
 Energy changes the resolved power setpoint while a direction is allowed:
 
@@ -193,8 +193,16 @@ USART1 emits one CSV record every 10 ms from boot at 921600 baud, 8-N-1. The USB
 | 60 | `btn_swen` | binary | Debounced pushbutton SWEN mailbox request; it does not expire. |
 | 61 | `btn_swen_valid` | binary | Pushbutton SWEN mailbox set since boot or reset by a mode transition. |
 | 62 | `cap_energy_mJ` | continuous, signed mJ | Integrated capacitor energy; charging adds and discharging subtracts. |
+| 63 | `vcap_max_mV` | continuous, mV | Current runtime Vcap maximum used by charge lockout, discharge lockout, and CAN capacity scaling. |
+| 64 | `cap_unhealthy` | binary | Latched once three consecutive bad one-minute capacitor-health windows cause a derate. |
+| 65 | `cap_bad_windows` | continuous, 0..3 | Current consecutive bad-window count; reset after a derate or a good window. |
+| 66 | `cap_derates` | continuous, uint8 | Number of 0.1 V runtime derates since boot. |
+| 67 | `cap_dE_mJ_min` | continuous, signed mJ/min | Integrated energy change measured over the last completed one-minute health window. |
+| 68 | `cap_dV_mV_min` | continuous, signed mV/min | Vcap change measured over the last completed one-minute health window. |
 
-`cap_energy_mJ` starts at zero. On each upward crossing of 23.0 V it is rebased to 1,322,500 mJ, the ideal stored energy of a 5 F capacitor at 23.0 V. The anchor re-arms after Vcap falls to 22.9 V or below.
+`cap_energy_mJ` starts at zero. The 50 kHz ADC ISR integrates signed `Vcap * Iout` energy into 50-sample (1 ms) blocks; the 1 kHz task transfers completed blocks into the signed run-long counter while retaining fractional mJ. `Iout` is forced to zero while SWEN is off. On each upward crossing of 23.0 V the counter is rebased to 1,322,500 mJ, the ideal stored energy of a 5 F capacitor at 23.0 V. The anchor re-arms after Vcap falls to 22.9 V or below.
+
+The capacitor-health check compares energy and voltage across non-overlapping one-minute windows. A window is bad when energy rises by at least 500,000 mJ while Vcap rises by less than 100 mV. Three consecutive bad windows latch `cap_unhealthy`, reduce the runtime Vcap maximum by 0.1 V, and restart the count. Repeated groups of three bad windows continue derating down to a 23.0 V floor. The maximum, latch, and counters reset on reboot; the fixed 30 V hardware-safety threshold is unchanged.
 
 ### Control precedence
 
@@ -202,7 +210,7 @@ In external mode, fresh UART power plus energy wins; otherwise fresh CAN is used
 
 ### Local dashboard
 
-`tools/scv2_dashboard.py` is the read-only local viewer for this exact `T1` schema. It consumes only complete records with all 62 columns and ignores ordinary CLI output. Its field order is intentionally tied to this document.
+`tools/scv2_dashboard.py` is the read-only local viewer for this exact `T1` schema. It consumes only complete records with all 68 columns and ignores ordinary CLI output. Its field order is intentionally tied to this document.
 
 - Continuous fields are shown as live current-value cards; the dashboard does not retain or graph historical samples. Invalid CAN, UART, and manual command values are greyed out rather than shown as zero.
 - Validity and freshness fields are displayed as `VALID`/`INVALID` and `FRESH`/`STALE`; invalid or stale values are grey.
@@ -230,7 +238,7 @@ This is an automation-ready bench-test matrix for commands sent by the DEVC/peer
 - Profile `S` means `mode_req=0`, both UART freshness fields are `0`, `safe=1`, `uvlo=0`, `fault_latched=0`, and no earlier energy/Vcap lockout is retained. Use a current-limited supply and a safe load; start with `enable_module=0` cases.
 - Baseline `B0` is the accepted frame `[00 00 55 0A 00]`: power 85 W, energy 10 J, SWEN off. For a rejection test, send B0, wait at least 310 ms, then send the candidate. Immediately before the candidate, the expected retained state is `can_p=85`, `can_p_valid=1`, `can_p_fresh=0`, `can_e=10`, `can_e_valid=1`, `can_e_fresh=0`, `can_e_disabled=0`, `can_swen=0`, `can_swen_valid=1`, `can_swen_fresh=0`, `can_bus=0`, `decision=2`, `pset_W=0`, `swen_req=0`, and `swen_out=0`.
 - `valid` means a command was accepted since boot; it does **not** expire. All three CAN `fresh` fields use the same accepted-command timestamp and become `0` only after more than 300 ms without another accepted command.
-- Do not assert exact `seq`, ADC/DAC counts, measured voltages/currents, `dir_out`, or `led_out` unless the fixture controls their inputs. `swen_out` is exact only when the stated analogue/safety profile and its 2 ms/100 ms timing history make it deterministic.
+- Do not assert exact `seq`, ADC/DAC counts, measured voltages/currents, `dir_out`, or `led_out` unless the fixture controls their inputs. `swen_out` is exact only when the stated analogue/safety profile and its 1 ms/50 ms timing history make it deterministic.
 
 ### Wire contract
 
@@ -259,7 +267,7 @@ For every accepted packet with values `(P,E,SW)`, the common `T1` assertion with
 | T3 extended ID | `B0`; extended data ID `0x67`, DLC 5, `[00 00 50 00 00]` | Same T1 assertion as T2. The global non-matching extended filter sends this to FIFO1, not the command callback. |
 | T4 remote frame | `B0`; standard remote ID `0x067`, DLC 5 | Through 210 ms, `can_bus=0` and every B0 field remains unchanged/stale. Remote frames are rejected by the global filter, so they do not enter FIFO0/FIFO1. |
 | T5 wrong DLC | `B0`; standard data ID `0x067`, DLC `0..4` or `6..8` | Within 30 ms, `can_bus=1`; every B0 mailbox field remains unchanged/stale. This proves activity is noted before the DLC-5 check, but timestamp publication is not performed. |
-| T6 FIFO drain/order | `S`; enqueue in order valid `[00 00 50 00 00]`, invalid `[02 00 50 00 00]`, valid `[01 FF 78 09 03]` | Within 30 ms of the queue becoming non-empty, common accepted assertion `(120,777,1)`, `decision=4`, `pset_W=120`, `swen_req=1`. With the switch known off for at least 2 ms, `swen_out=1`; `reset=FF` causes no separate effect. |
+| T6 FIFO drain/order | `S`; enqueue in order valid `[00 00 50 00 00]`, invalid `[02 00 50 00 00]`, valid `[01 FF 78 09 03]` | Within 30 ms of the queue becoming non-empty, common accepted assertion `(120,777,1)`, `decision=4`, `pset_W=120`, `swen_req=1`. With the switch known off for at least 1 ms, `swen_out=1`; `reset=FF` causes no separate effect. |
 
 ### Payload validation matrix
 
@@ -279,7 +287,7 @@ Every rejected payload uses stale B0. Therefore `can_p=85`, `can_e=10`, `can_swe
 | P10 energy lower boundary | `S`; `[00 00 50 00 00]` | Common accepted assertion `(80,0,0)`; `swen_out=0`. |
 | P11 energy boundaries | `S`; `[00 00 50 14 00]`, `[00 00 50 37 00]`, `[00 00 50 3C 00]` | Respectively common accepted assertions `(80,20,0)`, `(80,55,0)`, `(80,60,0)`; each has `can_e_valid=1`, `can_e_disabled=0`, `swen_req=0`, `swen_out=0`. |
 | P12 energy just above range | stale `B0`; `[00 00 50 3D 00]` | Rejected assertion above (`61 J`). |
-| P13 energy-disabled sentinel | `S`; `[01 00 50 09 03]` | Exact accepted values: `can_p=80`, `can_e=777`, `can_e_valid=0`, `can_e_disabled=1`, `can_swen=1`, all CAN valid/fresh fields as defined above, `decision=4`, `pset_W=80`, `swen_req=1`. If SWEN has been off for at least 2 ms, `swen_out=1`. |
+| P13 energy-disabled sentinel | `S`; `[01 00 50 09 03]` | Exact accepted values: `can_p=80`, `can_e=777`, `can_e_valid=0`, `can_e_disabled=1`, `can_swen=1`, all CAN valid/fresh fields as defined above, `decision=4`, `pset_W=80`, `swen_req=1`. If SWEN has been off for at least 1 ms, `swen_out=1`. |
 | P14 other high energy | stale `B0`; `[00 00 50 0A 03]`, `[00 00 50 FF FF]` | Rejected assertion above for `778 J` and `65535 J`. |
 | P15 byte order | stale `B0`; `[00 00 50 03 09]` | Rejected assertion above: bytes decode little-endian as `0x0903=2307 J`, not 777 J. |
 
@@ -290,17 +298,17 @@ Every rejected payload uses stale B0. Therefore `can_p=85`, `can_e=10`, `can_swe
 | Case | Preconditions and command | Expected observed `T1` values |
 |---|---|---|
 | C1 CAN selected | `S`; send valid `[00 00 55 0A 00]` every 50 ms | On every sample after the first: common accepted assertion `(85,10,0)`, `decision=4`, `pset_W=85`, `swen_req=0`, `swen_out=0`. There must be no sample with CAN freshness zero between refreshes. |
-| C2 CAN timeout | `S`; send one `[01 00 50 09 03]`, then stop | Up to 300 ms: P13 assertion. After 310 ms: `can_p=80`, `can_e=777`, `can_swen=1`, CAN `valid=1`, all CAN `fresh=0`, `can_e_valid=0`, `can_e_disabled=1`, `decision=2`, `pset_W=0`, `swen_req=0`; `swen_out=0` after any outstanding 100 ms minimum-on interval. |
+| C2 CAN timeout | `S`; send one `[01 00 50 09 03]`, then stop | Up to 300 ms: P13 assertion. After 310 ms: `can_p=80`, `can_e=777`, `can_swen=1`, CAN `valid=1`, all CAN `fresh=0`, `can_e_valid=0`, `can_e_disabled=1`, `decision=2`, `pset_W=0`, `swen_req=0`; `swen_out=0` after any outstanding 50 ms minimum-on interval. |
 | C3 periodic refresh | `S`; send P13 at 50 ms intervals for 500 ms | Every post-settle T1 record has P13's exact mailbox fields, all CAN freshness fields `1`, `decision=4`, `pset_W=80`, `swen_req=1`, and (after the initial minimum-off interval) `swen_out=1`. |
 | C4 UART precedence | Supply fresh valid UART power and energy; send P13 | CAN fields show P13 exactly, while `uart_p_fresh=1`, `uart_e_fresh=1`, `uart_swen_req=1`, and `decision=5`. `pset_W` uses UART power plus the applicable direction/energy adjustment, and `swen_req`/`swen_out` follow UART policy rather than CAN. After either UART freshness field reaches 0 while CAN remains fresh: `decision=4`, `pset_W=80`, `swen_req=1`. |
 | C5 enable off | `S`; send `[00 00 50 09 03]` | Exact: `can_p=80`, `can_e=777`, `can_e_valid=0`, `can_e_disabled=1`, `can_swen=0`, all CAN valid/fresh fields `1`, `decision=4`, `pset_W=80`, `swen_req=0`, `swen_out=0`. |
-| C6 sentinel enable on | `S`, switch off for at least 2 ms; send P13 | P13 exact assertion, including `swen_req=1`; `swen_out=1` in the next settled T1 record. |
-| C7 charge adjustment | `S`; force `i_conv>0`, Vcap `<26.3 V`, and no charge lockout. Send `[01 00 50 32 00]`, then `[01 00 50 33 00]` | At 50 J: common accepted `(80,50,1)`, `pset_W=60`, `swen_req=1`, and `swen_out=1` after the 2 ms off limit. At 51 J: common accepted `(80,51,1)`, `pset_W=90`, and SWEN remains requested/on. The energy boundary changes power, not enable permission. |
+| C6 sentinel enable on | `S`, switch off for at least 1 ms; send P13 | P13 exact assertion, including `swen_req=1`; `swen_out=1` in the next settled T1 record. |
+| C7 charge adjustment | `S`; force `i_conv>0`, Vcap below the current runtime maximum, and no charge lockout. Send `[01 00 50 32 00]`, then `[01 00 50 33 00]` | At 50 J: common accepted `(80,50,1)`, `pset_W=60`, `swen_req=1`, and `swen_out=1` after the 1 ms off limit. At 51 J: common accepted `(80,51,1)`, `pset_W=90`, and SWEN remains requested/on. The energy boundary changes power, not enable permission. |
 | C8 discharge adjustment | `S`; force `i_conv<0`, Vcap `>5.26 V`, and no discharge lockout. Send `[01 00 50 13 00]`, then `[01 00 50 14 00]` | At 19 J: common accepted `(80,19,1)`, `pset_W=70`, `swen_req=1`, and `swen_out=1` after minimum-off. At 20 J: common accepted `(80,20,1)`, `pset_W=100`, and SWEN remains requested/on. The energy boundary changes power, not enable permission. |
-| C9 Vcap hysteresis | Charge profile: use 51 J, enter below 26.3 V, raise Vcap to `>=26.3 V`, then lower to `<=26.1 V`. Discharge profile: use 19 J, enter above 5.26 V, lower Vcap to `<=5.26 V`, then raise to `>=5.46 V`. | In charge lockout, mailbox fields stay accepted/fresh, `decision=4`, `pset_W=80`, `swen_req=1`, and `swen_out=0`; after resume, `pset_W=90` and SWEN may turn on. In discharge lockout the corresponding values are `pset_W=80`/off, then `pset_W=70`/on after resume and timing. |
+| C9 Vcap hysteresis | Charge profile: use 51 J, enter below the current runtime maximum, raise Vcap to that maximum, then lower it by 0.1 V. Discharge profile: use 19 J, enter above 20% of the current maximum, lower Vcap to that level, then raise it by 0.1 V. Initially these pairs are 26.3/26.2 V and 5.26/5.36 V. | In charge lockout, mailbox fields stay accepted/fresh, `decision=4`, `pset_W=80`, `swen_req=1`, and `swen_out=0`; after resume, `pset_W=90` and SWEN may turn on. In discharge lockout the corresponding values are `pset_W=80`/off, then `pset_W=70`/on after resume and timing. |
 | C10 UVLO | `S`; keep P13 fresh, reduce Vbus to `<=10 V`, then restore to `>=11 V` | In UVLO: P13 mailbox fields remain fresh, `safe=1`, `uvlo=1`, `decision=1`, `pset_W=0`, `swen_req=0`, `swen_out=0`. After recovery and a fresh P13: `uvlo=0`, `decision=4`, `pset_W=80`, `swen_req=1`, `swen_out=1` after timing. |
 | C11 over-voltage fault | `S`; keep P13 fresh, make Vbus or Vcap `>=30 V`, then restore both below 30 V for 500 ms | At fault: P13 mailbox fields may remain fresh, `safe=0`, `fault_latched=1`, `fault_bits=1` (Vbus), `2` (Vcap), or `3`, `decision=0`, `pset_W=0`, `swen_req=0`, `swen_out=0`. Reset-byte values do not change this. After safe time: `safe=1`, eventually `fault_latched=0`, `fault_bits=0`; with P13 still fresh, CAN resolution resumes. |
-| C12 SWEN limits | `S`; keep P13 fresh. From a known off state send enable `1`, then send enable `0`, then `1` again | `swen_req` follows each accepted command within 30 ms. `swen_out` stays on for at least 100 ms after the on transition despite `swen_req=0`; after it goes off, it cannot turn on for at least 2 ms. T1's 10 ms period can show the 100 ms rule but cannot prove a 2 ms edge: use a GPIO logic analyser for that threshold. |
+| C12 SWEN limits | `S`; keep P13 fresh. From a known off state send enable `1`, then send enable `0`, then `1` again | `swen_req` follows each accepted command within 30 ms. `swen_out` stays on for at least 50 ms after the on transition despite `swen_req=0`; after it goes off, it cannot turn on for at least 1 ms. T1's 10 ms period can show the 50 ms rule but cannot prove a 1 ms edge: use a GPIO logic analyser for that threshold. |
 
 ### Acceptance criteria
 
