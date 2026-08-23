@@ -60,7 +60,7 @@ FIELDS = (
     Field("uart_swen_req", "UART SWEN request"), Field("man_p", "Manual power", "W"),
     Field("man_p_valid", "Manual power valid"), Field("man_swen", "Manual SWEN"),
     Field("man_swen_valid", "Manual SWEN valid"), Field("btn_swen", "Button SWEN"),
-    Field("btn_swen_valid", "Button SWEN valid"),
+    Field("btn_swen_valid", "Button SWEN valid"), Field("cap_net_mJ", "Net capacitor energy", "mJ"),
 )
 FIELD_BY_NAME = {field.name: field for field in FIELDS}
 
@@ -117,7 +117,7 @@ def demo_sample(sequence: int) -> dict[str, int]:
         "dac3_ch2": 2048, "mode_req": 0, "decision": 4, "swen_req": 1, "safe": 1,
         "fault_bits": 0, "can_bus": 1, "can_p": 80, "can_p_valid": 1, "can_p_fresh": 1,
         "can_e": 40, "can_e_valid": 1, "can_e_fresh": 1, "can_swen": 1, "can_swen_valid": 1,
-        "can_swen_fresh": 1,
+        "can_swen_fresh": 1, "cap_net_mJ": int(5_000_000 * math.sin(t / 10)),
     })
     return sample
 
@@ -382,7 +382,7 @@ class Dashboard(QtWidgets.QMainWindow):
     def _live_values_page(self) -> QtWidgets.QWidget:
         page = QtWidgets.QWidget()
         layout = QtWidgets.QGridLayout(page)
-        layout.addWidget(self._value_grid("Calibrated electrical values", ["vb_mV", "vc_mV", "il_mA", "iop_mA", "ion_mA", "io_mA", "ic_mA", "pset_W"]), 0, 0)
+        layout.addWidget(self._value_grid("Calibrated electrical values", ["vb_mV", "vc_mV", "il_mA", "iop_mA", "ion_mA", "io_mA", "ic_mA", "pset_W", "cap_net_mJ"]), 0, 0)
         layout.addWidget(self._value_grid("Raw ADC values", ["adc_vcap", "adc_vbus", "adc_iload", "adc_iop", "adc_ion"]), 0, 1)
         layout.addWidget(self._value_grid("DAC values", ["dac1_ch1", "dac1_ch2", "dac3_ch1", "dac3_ch2"]), 1, 0)
         layout.addWidget(self._value_grid("Command values", ["can_p", "can_e", "uart_p", "uart_e", "man_p"]), 1, 1)
@@ -544,6 +544,9 @@ class Dashboard(QtWidgets.QMainWindow):
     def consume_sample(self, sample: dict[str, int]) -> None:
         self.last_sample = sample
         for name, card in self.numeric_cards.items():
+            if name == "cap_net_mJ":
+                card.set_state(f"{sample[name] / 1000.0:,.3f} J", "blue")
+                continue
             if name in VALIDITY_FIELD:
                 text, state = status_text_and_state(name, sample)
                 card.set_state(text, state)
@@ -605,6 +608,9 @@ def self_test() -> None:
     line = "T1," + ",".join(str(values[field.name]) for field in FIELDS)
     parsed = parse_t1(line)
     assert parsed == values
+    negative_energy = {**values, "cap_net_mJ": -1234}
+    negative_line = "T1," + ",".join(str(negative_energy[field.name]) for field in FIELDS)
+    assert parse_t1(negative_line)["cap_net_mJ"] == -1234
     assert parse_t1("CLI ready") is None
     assert status_text_and_state("decision", parsed) == ("CAN", "green")
     assert status_text_and_state("can_p", {**parsed, "can_p_valid": 0}) == ("INVALID", "grey")

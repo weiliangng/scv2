@@ -1269,6 +1269,7 @@ void StartTelemetryTask(void const * argument)
     const float i_out_n = g_latest.i_out_n;
     const float i_out = g_latest.i_out;
     const float i_conv = g_latest.i_conv;
+    const int32_t cap_energy_mj = g_cap_energy_mj;
     can_command_state_t can_command;
     uart_command_state_t uart_command;
     manual_command_state_t manual_command;
@@ -1309,7 +1310,7 @@ void StartTelemetryTask(void const * argument)
     const uint32_t dac3_ch2 = HAL_DAC_GetValue(&hdac3, DAC_CHANNEL_2) & 0x0FFFu;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "T1,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u\r\n",
+                       "T1,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%ld\r\n",
                        (unsigned long)hello_seq++,
                        (unsigned long)adc_seq_hz,
                        (unsigned long)dbg_stats.telemetry_records_dropped,
@@ -1370,7 +1371,8 @@ void StartTelemetryTask(void const * argument)
                        manual_command.swen.value ? 1u : 0u,
                        manual_command.swen.present ? 1u : 0u,
                        pushbutton_command.swen.value ? 1u : 0u,
-                       pushbutton_command.swen.present ? 1u : 0u);
+                       pushbutton_command.swen.present ? 1u : 0u,
+                       (long)cap_energy_mj);
     if (len > 0)
     {
       size_t msg_len = (size_t)len;

@@ -192,6 +192,7 @@ USART1 emits one CSV record every 10 ms from boot at 921600 baud, 8-N-1. The USB
 | 59 | `man_swen_valid` | binary | Manual SWEN has been set by the CLI since boot. |
 | 60 | `btn_swen` | binary | Debounced pushbutton SWEN mailbox request; it does not expire. |
 | 61 | `btn_swen_valid` | binary | Pushbutton SWEN mailbox set since boot or reset by a mode transition. |
+| 62 | `cap_net_mJ` | continuous, signed mJ | Net capacitor energy accumulated since boot; charging adds and discharging subtracts. |
 
 ### Control precedence
 
@@ -199,7 +200,7 @@ In external mode, fresh UART power plus energy wins; otherwise fresh CAN is used
 
 ### Local dashboard
 
-`tools/scv2_dashboard.py` is the read-only local viewer for this exact `T1` schema. It consumes only complete records with all 61 columns and ignores ordinary CLI output. Its field order is intentionally tied to this document.
+`tools/scv2_dashboard.py` is the read-only local viewer for this exact `T1` schema. It consumes only complete records with all 62 columns and ignores ordinary CLI output. Its field order is intentionally tied to this document.
 
 - Continuous fields are shown as live current-value cards; the dashboard does not retain or graph historical samples. Invalid CAN, UART, and manual command values are greyed out rather than shown as zero.
 - Validity and freshness fields are displayed as `VALID`/`INVALID` and `FRESH`/`STALE`; invalid or stale values are grey.

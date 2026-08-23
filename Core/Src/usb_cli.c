@@ -351,6 +351,10 @@ static void usbcli_cmd_status(void)
   const int32_t i_load_avg_mA = (int32_t)((sum_i_load_mA + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
   const int32_t i_out_avg_mA = (int32_t)((sum_i_out_mA + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
   const int32_t i_conv_avg_mA = (int32_t)((sum_i_conv_mA + (STATUS_AVG_SAMPLES / 2)) / STATUS_AVG_SAMPLES);
+  const int32_t cap_energy_mj = g_cap_energy_mj;
+  const uint32_t cap_energy_abs_mj = (cap_energy_mj < 0)
+                                         ? (uint32_t)(-(int64_t)cap_energy_mj)
+                                         : (uint32_t)cap_energy_mj;
 
   const uint32_t telemetry_seq = g_telemetry_seq;
   const uint32_t adc_seq_hz = g_adc_seq_hz;
@@ -424,6 +428,10 @@ static void usbcli_cmd_status(void)
   usbcli_printf("  Load current (average): %ld mA\r\n", (long)i_load_avg_mA);
   usbcli_printf("  Output current (average): %ld mA\r\n", (long)i_out_avg_mA);
   usbcli_printf("  Converter current command (I_conv) (average): %ld mA\r\n", (long)i_conv_avg_mA);
+  usbcli_printf("  Net capacitor energy since boot: %s%lu.%03lu J\r\n",
+                cap_energy_mj < 0 ? "-" : "",
+                (unsigned long)(cap_energy_abs_mj / 1000u),
+                (unsigned long)(cap_energy_abs_mj % 1000u));
 
   usbcli_printf("  Power setpoint: %ld W\r\n", (long)g_latest.p_set);
 

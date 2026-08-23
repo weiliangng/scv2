@@ -84,6 +84,7 @@ static inline void gpio_write_masked_bsrr(GPIO_TypeDef *port, uint16_t affect_ma
 
 static uint8_t g_swen_last_applied = 0xFFu; /* force first apply */
 static uint32_t dir_counter = 0;
+static float cap_energy_remainder_mj;
 
 static uint8_t ScapSafety_FaultBits(float v_bus, float v_cap)
 {
@@ -285,8 +286,13 @@ void DMA1_Channel1_IRQHandler(void)
     const bool fault_latched = (safety_state & SCAP_FAST_SAFETY_FAULT_LATCHED) != 0u;
     const bool uvlo_lockout = (safety_state & SCAP_FAST_SAFETY_UVLO_LOCKOUT) != 0u;
 
-
-    g_cap_energy_delta += g_latest.i_out * v_cap * 1/50000;
+    if (g_latest.i_conv != 0.0f)
+    {
+      cap_energy_remainder_mj += g_latest.i_out * v_cap * SCAP_ADC_ISR_INTERVAL_S * 1000.0f;
+      const int32_t whole_mj = (int32_t)cap_energy_remainder_mj;
+      g_cap_energy_mj += whole_mj;
+      cap_energy_remainder_mj -= (float)whole_mj;
+    }
 
     // ADC2 (see `shared_state.h`): [0]=ILOAD differential (offset-binary)
     const uint16_t n_adc_iload = g_adc2_dma_buf[0] & 0x0FFFU;

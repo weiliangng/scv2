@@ -15,7 +15,7 @@ volatile uint32_t g_adc_seq_count;
 volatile bool g_is_safe;
 volatile uint32_t g_adc_seq_hz;
 volatile uint32_t g_telemetry_seq;
-volatile float g_cap_energy_delta = 0.0f;
+volatile int32_t g_cap_energy_mj;
 
 /* See `Core/Inc/shared_state.h` for buffer index meanings. */
 volatile uint16_t g_adc1_dma_buf[2];
