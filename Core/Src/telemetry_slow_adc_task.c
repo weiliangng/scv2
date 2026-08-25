@@ -112,6 +112,9 @@ void TelemetrySlowAdcTask_Run(void const *argument)
       const float v_bus = g_latest.v_bus;
       const float i_load = g_latest.i_load;
       const float i_conv = g_latest.i_conv;
+      const float v_cap = g_latest.v_cap;
+
+      float p_load = v_bus * i_load;
 
       const uint16_t v_bus_10mV = clamp_u16((int32_t)((v_bus * 100.0f) + 0.5f));
       const int16_t i_load_10mA = clamp_i16((int32_t)((i_load * 100.0f) + ((i_load >= 0.0f) ? 0.5f : -0.5f)));
