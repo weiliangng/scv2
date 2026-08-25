@@ -65,6 +65,7 @@ FIELDS = (
     Field("cap_unhealthy", "Capacitor health"), Field("cap_bad_windows", "Bad minute streak"),
     Field("cap_derates", "Voltage derates"), Field("cap_dE_mJ_min", "Last energy gain", "mJ/min"),
     Field("cap_dV_mV_min", "Last voltage gain", "mV/min"),
+    Field("can_tx_enqueue_fail", "CAN TX enqueue failures"),
 )
 FIELD_BY_NAME = {field.name: field for field in FIELDS}
 
@@ -124,6 +125,7 @@ def demo_sample(sequence: int) -> dict[str, int]:
         "can_swen_fresh": 1, "cap_energy_mJ": int(5_000_000 * math.sin(t / 10)),
         "vcap_max_mV": 26200, "cap_unhealthy": 0, "cap_bad_windows": 2,
         "cap_derates": 1, "cap_dE_mJ_min": 550000, "cap_dV_mV_min": 50,
+        "can_tx_enqueue_fail": 2,
     })
     return sample
 
@@ -393,7 +395,7 @@ class Dashboard(QtWidgets.QMainWindow):
         layout.addWidget(self._value_grid("DAC values", ["dac1_ch1", "dac1_ch2", "dac3_ch1", "dac3_ch2"]), 1, 0)
         layout.addWidget(self._value_grid("Command values", ["can_p", "can_e", "uart_p", "uart_e", "man_p"]), 1, 1)
         layout.addWidget(self._value_grid("Capacitor health", ["vcap_max_mV", "cap_bad_windows", "cap_derates", "cap_dE_mJ_min", "cap_dV_mV_min"]), 2, 0)
-        layout.addWidget(self._value_grid("Telemetry and diagnostics", ["seq", "adc_hz", "usb_drop", "dma_last", "dma_max", "fault_healthy_ms"]), 2, 1)
+        layout.addWidget(self._value_grid("Telemetry and diagnostics", ["seq", "adc_hz", "usb_drop", "dma_last", "dma_max", "fault_healthy_ms", "can_tx_enqueue_fail"]), 2, 1)
         return page
 
     def _status_page(self) -> QtWidgets.QWidget:
@@ -560,6 +562,10 @@ class Dashboard(QtWidgets.QMainWindow):
             if name == "cap_dE_mJ_min":
                 card.set_state(f"{sample[name] / 1000.0:,.3f} J/min", "blue")
                 continue
+            if name == "can_tx_enqueue_fail":
+                text, state = status_text_and_state(name, sample)
+                card.set_state(text, state)
+                continue
             if name in VALIDITY_FIELD:
                 text, state = status_text_and_state(name, sample)
                 card.set_state(text, state)
@@ -599,6 +605,8 @@ def status_text_and_state(name: str, sample: dict[str, int]) -> tuple[str, str]:
     if name == "fault_bits":
         labels = {0: "NO FAULT", 1: "VBUS OVP", 2: "VCAP OVP", 3: "VBUS + VCAP OVP"}
         return labels.get(value, f"UNKNOWN (0x{value:X})"), "green" if value == 0 else "red"
+    if name == "can_tx_enqueue_fail":
+        return f"{value:,}", "green" if value == 0 else "red"
     if name in TEXT:
         off, on = TEXT[name]
         text = on if value else off
@@ -628,6 +636,8 @@ def self_test() -> None:
     assert status_text_and_state("decision", parsed) == ("CAN", "green")
     assert status_text_and_state("can_p", {**parsed, "can_p_valid": 0}) == ("INVALID", "grey")
     assert status_text_and_state("cap_unhealthy", {**parsed, "cap_unhealthy": 1}) == ("UNHEALTHY", "red")
+    assert status_text_and_state("can_tx_enqueue_fail", {**parsed, "can_tx_enqueue_fail": 0}) == ("0", "green")
+    assert status_text_and_state("can_tx_enqueue_fail", parsed) == ("2", "red")
     stream = NewlineStreamParser()
     assert stream.feed(b"CLI ready\nT1,1") == [b"CLI ready"]
     assert stream.feed(b",2\r\nlast") == [b"T1,1,2\r"]

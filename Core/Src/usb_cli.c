@@ -15,6 +15,7 @@
 #include "can_protocol.h"
 #include "command_inputs.h"
 #include "scap_io_owner.h"
+#include "telemetry_slow_adc_task.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -359,6 +360,7 @@ static void usbcli_cmd_status(void)
 
   const uint32_t telemetry_seq = g_telemetry_seq;
   const uint32_t adc_seq_hz = g_adc_seq_hz;
+  const uint32_t can_tx_enqueue_failures = TelemetrySlowAdcTask_GetCanTxEnqueueFailureCount();
   control_status_t control_status;
   ScapIo_ReadStatus(&control_status);
   capacitor_monitor_status_t cap_monitor_status;
@@ -451,6 +453,8 @@ static void usbcli_cmd_status(void)
   usbcli_printf("  T1 telemetry sequence number: %lu\r\n", (unsigned long)telemetry_seq);
   usbcli_printf("  ADC trigger frequency estimate: %lu Hz\r\n", (unsigned long)adc_seq_hz);
   usbcli_printf("  CAN bus activity up: %u\r\n", can_bus_up ? 1u : 0u);
+  usbcli_printf("  CAN telemetry TX enqueue failures: %lu\r\n",
+                (unsigned long)can_tx_enqueue_failures);
   usbcli_printf("  Freshness CAN/UART-power/UART-energy: %u/%u/%u\r\n",
                 control_status.can_fresh ? 1u : 0u,
                 control_status.uart_power_fresh ? 1u : 0u,

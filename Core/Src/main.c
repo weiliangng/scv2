@@ -1286,6 +1286,7 @@ void StartTelemetryTask(void const * argument)
     CapacitorMonitor_ReadStatus(&cap_monitor_status);
     DbgUsbStats dbg_stats;
     DbgUsb_GetStats(&dbg_stats);
+    const uint32_t can_tx_enqueue_failures = TelemetrySlowAdcTask_GetCanTxEnqueueFailureCount();
 
     const uint32_t can_valid = can_command.can_cmd_timestamp != 0u ? 1u : 0u;
     const uint32_t can_bus_up = CanProtocol_IsBusActive(now_ms) ? 1u : 0u;
@@ -1315,7 +1316,7 @@ void StartTelemetryTask(void const * argument)
     const uint32_t dac3_ch2 = HAL_DAC_GetValue(&hdac3, DAC_CHANNEL_2) & 0x0FFFu;
     int len = snprintf(msg,
                        sizeof(msg),
-                       "T1,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%ld,%ld,%u,%u,%u,%ld,%ld\r\n",
+                       "T1,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%lu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%d,%u,%u,%u,%u,%u,%ld,%ld,%u,%u,%u,%ld,%ld,%lu\r\n",
                        (unsigned long)hello_seq++,
                        (unsigned long)adc_seq_hz,
                        (unsigned long)dbg_stats.telemetry_records_dropped,
@@ -1383,7 +1384,8 @@ void StartTelemetryTask(void const * argument)
                        (unsigned)cap_monitor_status.bad_window_count,
                        (unsigned)cap_monitor_status.derate_count,
                        (long)cap_monitor_status.last_energy_gain_mj,
-                       (long)cap_monitor_status.last_vcap_gain_mv);
+                       (long)cap_monitor_status.last_vcap_gain_mv,
+                       (unsigned long)can_tx_enqueue_failures);
     if (len > 0)
     {
       size_t msg_len = (size_t)len;

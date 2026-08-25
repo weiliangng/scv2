@@ -199,6 +199,7 @@ USART1 emits one CSV record every 10 ms from boot at 921600 baud, 8-N-1. The USB
 | 66 | `cap_derates` | continuous, uint8 | Number of 0.1 V runtime derates since boot. |
 | 67 | `cap_dE_mJ_min` | continuous, signed mJ/min | Integrated energy change measured over the last completed one-minute health window. |
 | 68 | `cap_dV_mV_min` | continuous, signed mV/min | Vcap trend from averaged endpoints of the last completed one-minute health window. |
+| 69 | `can_tx_enqueue_fail` | continuous, uint32 | Cumulative `HAL_FDCAN_AddMessageToTxFifoQ()` failures since boot; this does not report missing acknowledgements or arbitration delays. |
 
 `cap_energy_mJ` starts at zero. The 50 kHz ADC ISR integrates signed `Vcap * Iout` energy into 50-sample (1 ms) blocks; the 1 kHz task transfers completed blocks into the signed run-long counter while retaining fractional mJ. `Iout` is forced to zero while SWEN is off. On each upward crossing of 23.0 V the counter is rebased to 1,322,500 mJ, the ideal stored energy of a 5 F capacitor at 23.0 V. The anchor re-arms after Vcap falls to 22.9 V or below.
 
@@ -210,7 +211,7 @@ In external mode, fresh UART power plus energy wins; otherwise fresh CAN is used
 
 ### Local dashboard
 
-`tools/scv2_dashboard.py` is the read-only local viewer for this exact `T1` schema. It consumes only complete records with all 68 columns and ignores ordinary CLI output. Its field order is intentionally tied to this document.
+`tools/scv2_dashboard.py` is the read-only local viewer for this exact `T1` schema. It consumes only complete records with all 69 columns and ignores ordinary CLI output. Its field order is intentionally tied to this document.
 
 - Continuous fields are shown as live current-value cards; the dashboard does not retain or graph historical samples. Invalid CAN, UART, and manual command values are greyed out rather than shown as zero.
 - Validity and freshness fields are displayed as `VALID`/`INVALID` and `FRESH`/`STALE`; invalid or stale values are grey.
