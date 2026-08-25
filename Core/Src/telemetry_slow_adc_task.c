@@ -113,35 +113,20 @@ void TelemetrySlowAdcTask_Run(void const *argument)
       const float i_load = g_latest.i_load;
       const float i_conv = g_latest.i_conv;
       const float v_cap = g_latest.v_cap;
+      const float p_load = v_bus * i_load;
 
-      float p_load = v_bus * i_load;
-
-      const uint16_t v_bus_10mV = clamp_u16((int32_t)((v_bus * 100.0f) + 0.5f));
-      const int16_t i_load_10mA = clamp_i16((int32_t)((i_load * 100.0f) + ((i_load >= 0.0f) ? 0.5f : -0.5f)));
-      const int16_t i_conv_10mA = clamp_i16((int32_t)((i_conv * 100.0f) + ((i_conv >= 0.0f) ? 0.5f : -0.5f)));
-
-      const float v_cap_max = CapacitorMonitor_GetVcapMaxV();
-      const float e_cap_max = 0.5f * C_cap * v_cap_max * v_cap_max;
-      const float e_now = 0.5f * C_cap * v_cap * v_cap;
-      float capacity_pct_f = 0.0f;
-      if (e_cap_max > 0.0f)
-      {
-        capacity_pct_f = (e_now / e_cap_max) * 100.0f;
-      }
-      if (capacity_pct_f > 100.0f)
-      {
-        capacity_pct_f = 100.0f;
-      }
-      uint8_t capacity_pct = clamp_u8((int32_t)(capacity_pct_f + 0.5f));
+      const uint16_t p_load_100mW = clamp_u16((int32_t)((p_load * 10.0f) + 0.5f));
+      const uint16_t v_cap_100mV = clamp_u16((int32_t)((v_cap * 10.0f) + 0.5f));
+      const int16_t i_conv_100mA = clamp_i16((int32_t)((i_conv * 10.0f) + ((i_conv >= 0.0f) ? 0.5f : -0.5f)));
 
       uint8_t data[8];
-      data[0] = (uint8_t)(v_bus_10mV & 0xFFu);
-      data[1] = (uint8_t)((v_bus_10mV >> 8) & 0xFFu);
-      data[2] = (uint8_t)((uint16_t)i_load_10mA & 0xFFu);
-      data[3] = (uint8_t)(((uint16_t)i_load_10mA >> 8) & 0xFFu);
-      data[4] = (uint8_t)((uint16_t)i_conv_10mA & 0xFFu);
-      data[5] = (uint8_t)(((uint16_t)i_conv_10mA >> 8) & 0xFFu);
-      data[6] = capacity_pct;
+      data[0] = (uint8_t)(p_load_100mW & 0xFFu);
+      data[1] = (uint8_t)((p_load_100mW >> 8) & 0xFFu);
+      data[2] = (uint8_t)((uint16_t)v_cap_100mV & 0xFFu);
+      data[3] = (uint8_t)(((uint16_t)v_cap_100mV >> 8) & 0xFFu);
+      data[4] = (uint8_t)((uint16_t)i_conv_100mA & 0xFFu);
+      data[5] = (uint8_t)(((uint16_t)i_conv_100mA >> 8) & 0xFFu);
+      data[6] = 0;
       data[7] = status_code;
 
       (void)HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &tx_header, data);
