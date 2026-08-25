@@ -21,7 +21,8 @@
 #define CAN_BUS_ACTIVITY_TIMEOUT_MS 200u
 
 /*
- * Telemetry sent from the supercap board on DEVC_NODE_ID (little-endian):
+ * Telemetry sent from the supercap board on DEVC_NODE_ID (little-endian).
+ * See CAN_TELEMETRY.md in the repository root for a downstream decoder:
  *   bytes 0..1: load power in 0.1 W, unsigned
  *   bytes 2..3: capacitor voltage in 0.1 V, unsigned
  *   bytes 4..5: converter current in 0.1 A, signed two's complement
