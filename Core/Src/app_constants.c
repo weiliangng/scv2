@@ -16,20 +16,24 @@ static const float DEFAULT_A_ILOAD = 0.008058608059f * 2.0f; // A/count
 static const float DEFAULT_B_ILOAD = -16.5f * 2.0f;          // A
 static const float DEFAULT_MIDPOINT = 2047.5f;               // count
 
-static const float DEFAULT_A_INP =  2754.776956f;   // counts
+static const float DEFAULT_A_INP =  2754.776956f;  // counts
 static const float DEFAULT_B_INP = -124.090909f;   // counts/A
+static const float DEFAULT_C_INP = 0.0f;
 
 static const float DEFAULT_A_INN = 2754.776956f;   // counts
 static const float DEFAULT_B_INN = 124.090909f;    // counts/A
+static const float DEFAULT_C_INN = 0.0f;
 
 static const float DEFAULT_A_VCAP = 0.009654528478f; // V/count
 static const float DEFAULT_B_VCAP = 0.0f;            // V
 
 static const float DEFAULT_A_OP = 0.00829074903f;  // A/count
 static const float DEFAULT_B_OP = -10.0f;          // A
+static const float DEFAULT_C_OP = -0.035f;         // A/Vcap?
 
 static const float DEFAULT_A_ON = -0.00829074903f; // A/count
 static const float DEFAULT_B_ON = 10.0f;           // A
+static const float DEFAULT_C_ON = -0.035f;         // A/Vcap?
 
 static const uint32_t DEFAULT_DAC3_CH1_BOOT_U12 = 920u; //26.3V
 static const uint32_t DEFAULT_DAC3_CH2_BOOT_U12 = 3723u;
