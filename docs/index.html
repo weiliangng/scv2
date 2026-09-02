@@ -1,122 +1,44 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="SCV2 supercapacitor controller: competition integration, telemetry, and diagnostics.">
-    <title>SCV2 | Supercapacitor Controller</title>
-    <style>
-      :root { --ink:#172033; --muted:#5d687d; --paper:#f7f9fc; --line:#dbe2ec; --accent:#087e8b; --accent-dark:#065c66; --navy:#10233f; --warn:#9a5b00; }
-      * { box-sizing:border-box; }
-      html { scroll-behavior:smooth; }
-      body { margin:0; color:var(--ink); background:var(--paper); font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
-      a { color:var(--accent-dark); font-weight:650; text-underline-offset:3px; }
-      a:hover { color:var(--accent); }
-      .wrap { width:min(1080px, calc(100% - 40px)); margin:auto; }
-      header { color:#fff; background:linear-gradient(125deg, #10233f 0%, #174a63 55%, #087e8b 140%); }
-      nav { display:flex; justify-content:space-between; gap:1rem; align-items:center; padding:1.15rem 0; }
-      nav a { color:#fff; text-decoration:none; }
-      .brand { font-size:1.05rem; letter-spacing:.08em; font-weight:800; }
-      .links { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:.9rem; font-size:.9rem; }
-      .hero { padding:4.5rem 0 4rem; max-width:760px; }
-      .eyebrow { margin:0 0 .7rem; color:#a9ebed; font-size:.78rem; letter-spacing:.12em; font-weight:800; text-transform:uppercase; }
-      h1 { margin:0; font-size:clamp(2.5rem, 7vw, 4.5rem); line-height:1.04; letter-spacing:-.055em; }
-      .hero p:last-of-type { max-width:650px; margin:1.3rem 0 1.8rem; color:#e4f6f7; font-size:1.15rem; }
-      .button { display:inline-block; padding:.7rem 1rem; border-radius:.45rem; color:#fff; background:var(--accent); text-decoration:none; font-weight:800; }
-      .button:hover { color:#fff; background:var(--accent-dark); }
-      main { padding:3.5rem 0 5rem; }
-      section { scroll-margin-top:1rem; margin:0 0 4rem; }
-      h2 { margin:0 0 .65rem; font-size:clamp(1.7rem,4vw,2.45rem); line-height:1.15; letter-spacing:-.035em; }
-      h3 { margin:.1rem 0 .35rem; font-size:1.14rem; }
-      .lead { max-width:770px; margin:0; color:var(--muted); font-size:1.06rem; }
-      .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:1.5rem; }
-      .card { padding:1.3rem; background:#fff; border:1px solid var(--line); border-radius:.7rem; box-shadow:0 2px 8px #13203b0b; }
-      .card p { margin:.4rem 0 0; color:var(--muted); }
-      .steps { display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; margin-top:1.4rem; counter-reset:step; }
-      .step { position:relative; padding:1.35rem 1.3rem 1.2rem 4.25rem; background:#fff; border-left:4px solid var(--accent); border-radius:.35rem; }
-      .step::before { counter-increment:step; content:counter(step); position:absolute; left:1.2rem; top:1.2rem; display:grid; width:1.9rem; height:1.9rem; place-items:center; border-radius:50%; color:#fff; background:var(--navy); font-weight:800; }
-      .step p { margin:.25rem 0 0; color:var(--muted); }
-      .note { margin-top:1.25rem; padding:1rem 1.2rem; border-left:4px solid #e5a236; color:#5e410e; background:#fff8e9; }
-      .resource { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1.1rem 0; border-bottom:1px solid var(--line); }
-      .resource p { margin:.2rem 0 0; color:var(--muted); }
-      code { padding:.1rem .3rem; border-radius:.25rem; background:#e9eef5; color:#29384f; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.9em; }
-      details { padding:1rem 1.15rem; background:#fff; border:1px solid var(--line); border-radius:.55rem; }
-      details + details { margin-top:.7rem; }
-      summary { cursor:pointer; font-weight:800; }
-      details p { margin:.7rem 0 0; color:var(--muted); }
-      footer { padding:2rem 0; border-top:1px solid var(--line); color:var(--muted); font-size:.9rem; }
-      @media (max-width:720px) { .grid,.steps { grid-template-columns:1fr; } nav { align-items:flex-start; flex-direction:column; } .links { justify-content:flex-start; } .resource { flex-direction:column; gap:.35rem; } }
-    </style>
-  </head>
-  <body>
-    <header>
-      <div class="wrap">
-        <nav aria-label="Primary navigation">
-          <a class="brand" href="#top">SCV2</a>
-          <div class="links">
-            <a href="#installation">Installation</a>
-            <a href="#robot">Robot interface</a>
-            <a href="#debugging">Debugging</a>
-            <a href="#faq">FAQ</a>
-          </div>
-        </nav>
-        <div id="top" class="hero">
-          <p class="eyebrow">Competition-ready energy control</p>
-          <h1>SCV2 Supercapacitor Controller</h1>
-          <p>One place for competition integration, live telemetry, and safe, practical diagnostics for the SCV2 supercapacitor bank.</p>
-          <a class="button" href="#installation">Start the integration checklist</a>
-        </div>
-      </div>
-    </header>
-    <main class="wrap">
-      <section id="introduction">
-        <h2>Introduction</h2>
-        <p class="lead">SCV2 is an STM32-based controller for a robot supercapacitor bank. In normal external control it uses fresh referee-UART information first, then CAN commands; it continuously enforces voltage, fault, and timing protection before enabling the power stage.</p>
-        <div class="grid">
-          <article class="card"><h3>Purpose</h3><p>Help a robot team integrate and operate a supercapacitor controller with clear visibility into control decisions, energy state, and electrical telemetry.</p></article>
-          <article class="card"><h3>Competition-facing control</h3><p>Reads the referee stream for chassis power and buffer energy, with CAN available as the alternate external command path.</p></article>
-          <article class="card"><h3>Diagnosable by design</h3><p>USB CLI, an always-on UART telemetry stream, CAN telemetry, and a desktop dashboard make faults and stale inputs easier to isolate.</p></article>
-        </div>
-      </section>
-
-      <section id="installation">
-        <h2>Physical installation for competition</h2>
-        <p class="lead">Use this as the final on-robot checklist. The repository does not define a mechanical mounting drawing or a board-connector pinout, so confirm those details against your released hardware documentation before powering the system.</p>
-        <div class="steps">
-          <article class="step"><h3>Mount and protect</h3><p>Secure the controller and bank so that vibration cannot loosen fasteners or strain cables. Keep conductive debris, tools, and exposed terminals clear of the power path.</p></article>
-          <article class="step"><h3>Inspect the power path</h3><p>Before energising, verify polarity, connector seating, insulation, and the team-approved fuse, switch, and shutdown arrangement.</p></article>
-          <article class="step"><h3>Connect the control links</h3><p>Connect the agreed referee-UART and/or CAN interfaces, including their required common reference. Check wiring against the robot schematic—not this trial site.</p></article>
-          <article class="step"><h3>Commission safely</h3><p>Start in an approved current-limited setup. Observe the controller before enabling the power stage and record the final competition configuration.</p></article>
-        </div>
-        <p class="note"><strong>Safety note:</strong> a software <code>ok</code> response confirms command acceptance, not a physical output change. Verify the actual state and follow your team’s electrical safety procedure.</p>
-      </section>
-
-      <section id="robot">
-        <h2>Interfacing with the robot</h2>
-        <p class="lead">External mode prioritises a fresh, CRC-validated referee UART power-and-energy pair. If that is not available, the controller uses fresh CAN input. If neither source is fresh, it stays in a no-source state rather than enabling the stage.</p>
-        <div class="grid">
-          <article class="card"><h3>Referee UART</h3><p>The board receives referee data on USART3 at 115200 baud, 8-N-1. Both power and energy must be fresh for the UART control path to request switch enable.</p></article>
-          <article class="card"><h3>CAN command and telemetry</h3><p>CAN is the alternate command source and also carries compact downstream telemetry: classic CAN, standard ID <code>0x077</code>, 1 Mbit/s, 8-byte frames.</p></article>
-          <article class="card"><h3>Telemetry UART</h3><p>USART1 transmits a <code>T1</code> CSV record every 10 ms at 921600 baud, 8-N-1 for a receiver, bridge, or test PC.</p></article>
-        </div>
-        <div class="resource"><div><h3>CAN receiver contract</h3><p>Frame layout, units, status flags, and a portable C decoder for downstream firmware.</p></div><a href="https://github.com/weiliangng/scv2/blob/main/CAN_TELEMETRY.md">Read the CAN guide →</a></div>
-      </section>
-
-      <section id="debugging">
-        <h2>Debugging features</h2>
-        <p class="lead">Begin with observation. The normal control path contains safety and voltage lockouts; direct output and calibration controls are advanced bench-only functions.</p>
-        <div class="resource"><div><h3>Dashboard for a quick view</h3><p>Connect via USB, external UART, or UDP to see the live 69-field <code>T1</code> record as readable state cards. The dashboard is read-only.</p></div><a href="https://github.com/weiliangng/scv2/blob/main/DASHBOARD_SETUP.md">Set up the dashboard →</a></div>
-        <div class="resource"><div><h3>How to assess bank capacity</h3><p>Use the health fields in <code>T1</code> during a controlled test: <code>cap_energy_mJ</code>, <code>cap_dE_mJ_min</code>, <code>cap_dV_mV_min</code>, and the derate counters expose the controller’s one-minute health windows. A formal capacity measurement still needs a team-approved load profile, voltage limits, and independent instrumentation.</p></div><a href="https://github.com/weiliangng/scv2/blob/main/agent.md#telemetry-t1-decoder">Read the telemetry reference →</a></div>
-        <div class="resource"><div><h3>CLI for advanced debugging</h3><p>The USB virtual COM-port CLI offers read-only <code>status</code> and telemetry control, plus clearly separated advanced control and calibration commands.</p></div><a href="https://github.com/weiliangng/scv2/blob/main/CLI_GUIDE.md">Open the CLI guide →</a></div>
-      </section>
-
-      <section id="faq">
-        <h2>FAQ</h2>
-        <details><summary>Why is switch enable off even though a command was accepted?</summary><p>Check <code>status</code> or the dashboard for fault state, undervoltage lockout, stale command sources, converter direction, capacitor-voltage lockout, and the minimum on/off timers. Acceptance alone does not override these protections.</p></details>
-        <details><summary>Can the dashboard and CLI use the same USB port together?</summary><p>No. A serial port is normally owned by one program at a time. Close the dashboard before opening a CLI terminal, and close the terminal before reconnecting the dashboard.</p></details>
-        <details><summary>Which page should I use for hardware pinouts?</summary><p>This trial site deliberately does not invent a board pinout. Use your released schematic, connector documentation, and competition wiring record; then link them here when they are ready for publication.</p></details>
-      </section>
-    </main>
-    <footer><div class="wrap">SCV2 documentation trial site · Source and detailed technical guides live in this repository.</div></footer>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SCV2 supercapacitor controller documentation.">
+  <title>SCV2</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <p class="site-name">SCV2</p>
+    <nav aria-label="Main navigation">
+      <a aria-current="page" href="index.html">Home</a>
+      <a href="installation.html">Installation</a>
+      <a href="interface.html">Robot interface</a>
+      <a href="debugging.html">Debugging</a>
+      <a href="faq.html">FAQ</a>
+    </nav>
+  </header>
+  <main>
+    <h1>SCV2 supercapacitor controller</h1>
+    <p>SCV2 controls a robot supercapacitor bank and reports its operating state.</p>
+    <h2>Purpose</h2>
+    <p>Manage power flow while applying voltage, fault, command-timeout, and switching protections.</p>
+    <h2>Features</h2>
+    <ul>
+      <li>Referee UART and CAN control inputs</li>
+      <li>CAN and UART telemetry</li>
+      <li>USB command-line interface</li>
+      <li>Desktop telemetry dashboard</li>
+      <li>Capacitor health monitoring</li>
+    </ul>
+    <h2>Documentation</h2>
+    <ul>
+      <li><a href="installation.html">Physical installation</a></li>
+      <li><a href="interface.html">Robot interface</a></li>
+      <li><a href="debugging.html">Debugging and testing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+    </ul>
+  </main>
+  <footer><a href="https://github.com/weiliangng/scv2">Source repository</a></footer>
+</body>
 </html>
