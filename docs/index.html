@@ -3,98 +3,227 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="SCV2 supercapacitor controller documentation.">
-  <title>SCV2</title>
+  <meta name="description" content="Learn how SCV2 gives power-limited robots a larger energy buffer, explore its capabilities, and read the integration documentation.">
+  <title>SCV2 — More power when your robot needs it</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <header>
-    <p class="site-name">SCV2</p>
+<body class="home-page">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="SCV2 home">
+      <span class="brand-mark" aria-hidden="true">S2</span>
+      <span><strong>SCV2</strong><small>Supercapacitor controller</small></span>
+    </a>
     <nav aria-label="Main navigation">
-      <a aria-current="page" href="index.html">Home</a>
-      <a href="installation.html">Installation</a>
-      <a href="interface.html">Robot interface</a>
-      <a href="debugging.html">Debugging</a>
-      <a href="faq.html">FAQ</a>
+      <a aria-current="page" href="index.html">Overview</a>
+      <a href="#features">Features</a>
+      <a href="#documentation">Docs</a>
+      <a class="nav-cta" href="installation.html">Get started</a>
     </nav>
   </header>
-  <main>
-    <h1>SCV2 supercapacitor controller</h1>
-    <p>SCV2 manages a physical energy buffer for power-limited robot chassis motors.</p>
 
-    <h2>Why an energy buffer is needed</h2>
-    <p>The referee system limits chassis motor power from 50 W to 120 W across robot levels 1 to 10. It also provides a 60 J virtual power buffer for short periods above that limit.</p>
-    <p>When chassis power exceeds the limit, the virtual buffer drains by the excess power. For example, 60 W above the limit consumes 60 J in one second. When chassis power is below the limit, the unused allowance refills the buffer.</p>
-    <p>If a level 1 robot stops moving, the full 50 W allowance is available. The virtual buffer will refill in:</p>
-    <p><code>60 J / 50 W = 1.2 s</code></p>
-    <p>A depleted buffer can trigger a competition penalty which used to be HP loss, but now results in a temporary chassis shutdown for 5 seconds.</p>
+  <main id="main-content">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow"><span></span> Built for power-limited robot chassis</p>
+        <h1>Save energy now.<br><em>Spend it when it matters.</em></h1>
+        <p class="hero-lede">SCV2 gives your robot a physical energy buffer, so hard acceleration, ramps, and sudden loads do not empty the referee buffer as quickly.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#how-it-works">Learn how it works <span aria-hidden="true">↓</span></a>
+          <a class="button button-secondary" href="installation.html">Install SCV2 <span aria-hidden="true">→</span></a>
+        </div>
+        <ul class="hero-stats" aria-label="Key specifications">
+          <li><strong>97%</strong><span>peak efficiency</span></li>
+          <li><strong>&lt;1 ms</strong><span>load-step settling</span></li>
+          <li><strong>±240 W</strong><span>bidirectional power</span></li>
+        </ul>
+      </div>
+      <div class="energy-demo" aria-label="Illustration of energy moving between the chassis and supercapacitor">
+        <div class="demo-label"><span class="status-dot"></span> Energy buffer active</div>
+        <div class="energy-gauge">
+          <span class="gauge-value">1,320</span>
+          <span class="gauge-unit">J available</span>
+          <span class="gauge-ring" aria-hidden="true"></span>
+        </div>
+        <div class="power-flow">
+          <div><span class="flow-icon battery-icon" aria-hidden="true"></span><small>Chassis bus</small><strong>24.1 V</strong></div>
+          <span class="flow-line" aria-hidden="true"><i></i><i></i><i></i></span>
+          <div><span class="flow-icon cap-icon" aria-hidden="true"></span><small>Supercapacitor</small><strong>26.8 V</strong></div>
+        </div>
+        <p class="demo-note">Supporting a power spike <strong>−186 W</strong></p>
+      </div>
+    </section>
 
-    <figure>
-      <img src="assets/chassis.png" alt="Chassis power draw crossing the referee power limit. Power above the limit consumes stored energy, while power below the limit provides surplus energy for charging.">
-      <figcaption>Chassis power fluctuates above and below the referee limit during a match.</figcaption>
-    </figure>
+    <section class="lesson-section" id="how-it-works">
+      <div class="section-heading lesson-heading">
+        <p class="section-kicker">The 3-minute lesson</p>
+        <h2>First, understand the energy problem.</h2>
+        <p>You do not need to be a power-electronics expert. Start with the referee’s virtual buffer, then see how SCV2 adds a much larger physical one.</p>
+      </div>
 
-    <h2>The physical buffer</h2>
-    <p>SCV2 is a bidirectional switching converter that works with a supercapacitor bank of up to 2000 J. It is intended to behave like a larger version of the referee system's virtual buffer.</p>
-    <p>Chassis power is measured from voltage and current. When chassis power is below the referee limit, SCV2 uses the surplus to charge the capacitor bank. When chassis power exceeds the limit, the bank supplies the difference.</p>
-    <p>The converter supports constant input-power regulation and CC/CV charging. After conversion losses and operating limits, the expected usable energy is about 1200 to 1400 J. This supports short loads such as acceleration, ramps, and slopes without depleting the referee buffer as quickly.</p>
+      <div class="lesson-grid">
+        <article class="lesson-card">
+          <span class="lesson-number">01</span>
+          <p class="lesson-question">What is the limit?</p>
+          <h3>Your robot gets a power budget.</h3>
+          <p>The referee system limits chassis motor power from <strong>50 W to 120 W</strong>, depending on robot level. A small 60 J virtual buffer allows brief moments above that limit.</p>
+          <div class="mini-meter" aria-label="Power limit with a short burst above it">
+            <span>Normal</span><span>Burst</span><div><i></i></div>
+          </div>
+        </article>
 
-    <h2>Specifications</h2>
-    <p><strong>Port convention:</strong> IN is the chassis-bus side and OUT is the supercapacitor side. Since power flow is bidirectional, each port can source or sink power.</p>
-    <table class="specs">
-      <thead>
-        <tr><th>Port</th><th>Parameter</th><th>Range or limit</th></tr>
-      </thead>
-      <tbody>
-        <tr><td rowspan="4"><strong>IN</strong><br>Chassis bus</td><td>Voltage range</td><td>12 to 28 V</td></tr>
-        <tr><td>Current limit</td><td>-10 to +10 A; programmable in debug mode</td></tr>
-        <tr><td>Power setting</td><td>-240 to +240 W; programmable in 1 W steps</td></tr>
-        <tr><td>Reverse-flow voltage limit</td><td>26.2 V if the battery is disconnected or shuts down while reverse power is set</td></tr>
-        <tr><td rowspan="2"><strong>OUT</strong><br>Supercapacitor</td><td>Voltage range and setting</td><td>5 to 30 V; digitally programmable</td></tr>
-        <tr><td>Current limit</td><td>-15 to +15 A; fixed limits</td></tr>
-        <tr><td><strong>Response</strong></td><td>Chassis load-step settling time</td><td>&lt;1 ms; 150 &micro;s typical</td></tr>
-        <tr><td><strong>Performance</strong></td><td>Peak efficiency</td><td>Up to 97%</td></tr>
-      </tbody>
-    </table>
-    <p><strong>Power sign:</strong> positive power flows from IN to OUT and charges the bank. Negative power flows from OUT to IN and supports the chassis bus.</p>
+        <article class="lesson-card featured-lesson">
+          <span class="lesson-number">02</span>
+          <p class="lesson-question">What happens during a burst?</p>
+          <h3>Extra power spends stored energy.</h3>
+          <p>If the chassis draws 60 W above its limit for one second, it consumes 60 J. When demand falls below the limit, the unused allowance refills the buffer.</p>
+          <div class="formula"><span>60 W</span><b>×</b><span>1 s</span><b>=</b><strong>60 J</strong></div>
+          <p class="margin-note">Power × time = energy</p>
+          <p class="lesson-warning"><strong>Why it matters:</strong> depleting the referee buffer can cause a five-second chassis shutdown.</p>
+        </article>
 
-    <figure>
-      <img src="assets/power-envelope-24v.png" alt="SCV2 power transfer envelope at a 24 volt chassis bus. Transfer is limited by 15 amp supercapacitor current below 16 volts and by 240 watts above 16 volts.">
-      <figcaption>Power transfer envelope at a 24 V chassis bus.</figcaption>
-    </figure>
+        <article class="lesson-card">
+          <span class="lesson-number">03</span>
+          <p class="lesson-question">Why add SCV2?</p>
+          <h3>A physical buffer lasts longer.</h3>
+          <p>SCV2 stores surplus power in a supercapacitor bank, then returns it during acceleration and climbs—giving you roughly <strong>1,200–1,400 J</strong> of usable energy.</p>
+          <div class="capacity-compare" aria-label="SCV2 has over twenty times the usable energy of the referee buffer">
+            <span><i style="--fill: 5%"></i><small>Referee</small><b>60 J</b></span>
+            <span><i style="--fill: 100%"></i><small>SCV2</small><b>~1,300 J</b></span>
+          </div>
+        </article>
+      </div>
 
-    <figure>
-      <img src="assets/maximum-power-transfer.png" alt="Maximum SCV2 power transfer by chassis-bus voltage and supercapacitor voltage, showing input-current, output-current, and 240 watt limits.">
-      <figcaption>Maximum transfer magnitude across the specified voltage range.</figcaption>
-    </figure>
+      <figure class="lesson-figure">
+        <div class="figure-copy">
+          <p class="section-kicker">Put it together</p>
+          <h3>Charge in the quiet moments. Assist in the demanding ones.</h3>
+          <p>Below the referee limit, SCV2 captures unused power. Above it, SCV2 supplies the difference. The chassis gets the response it needs while the referee sees a steadier load.</p>
+          <div class="legend"><span class="legend-charge">Surplus charges the bank</span><span class="legend-assist">Stored energy assists</span></div>
+        </div>
+        <img src="assets/chassis.png" alt="Chassis power crossing the referee limit. Power below the limit charges the buffer and power above it is supported by stored energy.">
+      </figure>
+    </section>
 
-    <h2>Protection and fault handling</h2>
-    <p class="notice">The hardware is designed to tolerate these events, but they are not recommended operating procedures.</p>
-    <ul>
-      <li>Hot-plugging the power source</li>
-      <li>Hot-plugging a charged or discharged supercapacitor bank</li>
-      <li>Short-circuit current limiting</li>
-      <li>Overvoltage detection and shutdown on both ports</li>
-      <li>IN-port undervoltage lockout</li>
-      <li>Capacitor degradation detection with charge-voltage foldback when added energy does not produce the expected voltage rise</li>
-    </ul>
+    <section class="features-section" id="features">
+      <div class="section-heading feature-heading">
+        <p class="section-kicker">Engineered for competition</p>
+        <h2>More usable power.<br>Less integration drama.</h2>
+        <p>Fast control, practical interfaces, and protection designed around what actually happens inside a robot.</p>
+      </div>
 
-    <h2>Features</h2>
-    <ol>
-      <li>Robot-independent UART and CAN interfaces</li>
-      <li><a href="debugging.html">USB CLI</a> for field debugging and manual bank-capacity testing</li>
-      <li><a href="debugging.html">Telemetry dashboard</a> over wired USB serial or Wi-Fi UDP; Wi-Fi requires an additional transmitter</li>
-      <li>Normal installation does not require individual board calibration after initial flashing and soldering</li>
-      <li>No unintended backfeeding or "zombie power"; no isolation relay required</li>
-    </ol>
-    <h2>Documentation</h2>
-    <ul>
-      <li><a href="installation.html">Physical installation</a></li>
-      <li><a href="interface.html">Robot interface</a></li>
-      <li><a href="debugging.html">Debugging and testing</a></li>
-      <li><a href="faq.html">FAQ</a></li>
-    </ul>
+      <div class="feature-grid">
+        <article class="feature-card feature-card-large">
+          <span class="feature-icon" aria-hidden="true">↗</span>
+          <p class="feature-label">Fast response</p>
+          <h3>Reacts before the robot feels the dip.</h3>
+          <p>Typical 150 μs chassis load-step settling keeps power delivery controlled through sudden changes.</p>
+          <strong class="big-number">150 <small>μs typical</small></strong>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon" aria-hidden="true">⇄</span>
+          <p class="feature-label">Bidirectional</p>
+          <h3>One converter. Both directions.</h3>
+          <p>Charge the bank from unused allowance, then support the chassis at up to 240 W.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon" aria-hidden="true">⌁</span>
+          <p class="feature-label">Robot-friendly</p>
+          <h3>CAN, UART, USB and telemetry.</h3>
+          <p>Integrate with your control stack, debug in the pit, and monitor live data from the dashboard.</p>
+        </article>
+        <article class="feature-card feature-card-wide">
+          <div>
+            <span class="feature-icon" aria-hidden="true">◇</span>
+            <p class="feature-label">Built-in protection</p>
+            <h3>Designed for imperfect real-world moments.</h3>
+          </div>
+          <ul class="check-list">
+            <li>Short-circuit current limiting</li>
+            <li>Overvoltage shutdown on both ports</li>
+            <li>IN-port undervoltage lockout</li>
+            <li>Capacitor degradation detection</li>
+            <li>No unintended backfeeding</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="proof-strip">
+        <p><span class="status-dot"></span> At a glance</p>
+        <dl>
+          <div><dt>Input</dt><dd>12–28 V</dd></div>
+          <div><dt>Supercapacitor</dt><dd>5–30 V</dd></div>
+          <div><dt>Current</dt><dd>±10 A in / ±15 A out</dd></div>
+          <div><dt>Control</dt><dd>Constant power + CC/CV</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="docs-section" id="documentation">
+      <div class="docs-shell">
+        <aside class="docs-sidebar" aria-label="Documentation navigation preview">
+          <p class="docs-wordmark"><span aria-hidden="true">S2</span> SCV2 Docs</p>
+          <label>Documentation</label>
+          <a class="active" href="index.html">Introduction</a>
+          <a href="installation.html">Installation</a>
+          <a href="interface.html">Robot interface</a>
+          <a href="debugging.html">Debugging &amp; testing</a>
+          <a href="faq.html">FAQ</a>
+          <label>Resources</label>
+          <a href="https://github.com/weiliangng/scv2/blob/main/CAN_TELEMETRY.md">CAN telemetry ↗</a>
+          <a href="https://github.com/weiliangng/scv2/blob/main/CLI_GUIDE.md">CLI guide ↗</a>
+        </aside>
+        <div class="docs-content">
+          <p class="docs-breadcrumb">Docs <span>/</span> Introduction</p>
+          <h2>Build with SCV2</h2>
+          <p class="docs-lede">Everything you need to install the hardware, connect your robot, and inspect the controller in the field.</p>
+          <div class="docs-callout"><strong>New to SCV2?</strong> Start with physical installation, then connect CAN or referee UART before commissioning the power stage.</div>
+          <div class="doc-link-grid">
+            <a href="installation.html"><span>01</span><strong>Physical installation</strong><small>Mounting, wiring, safety, and commissioning.</small><b>Read guide →</b></a>
+            <a href="interface.html"><span>02</span><strong>Robot interface</strong><small>CAN frames, UART commands, and telemetry.</small><b>Read guide →</b></a>
+            <a href="debugging.html"><span>03</span><strong>Debugging &amp; testing</strong><small>Dashboard, USB CLI, and capacity checks.</small><b>Read guide →</b></a>
+            <a href="faq.html"><span>04</span><strong>FAQ</strong><small>Common integration and field questions.</small><b>Find an answer →</b></a>
+          </div>
+
+          <section class="technical-reference" aria-labelledby="technical-reference-title">
+            <h3 id="technical-reference-title">Technical reference</h3>
+            <p><strong>Port convention:</strong> IN is the chassis-bus side and OUT is the supercapacitor side. Both ports can source or sink power.</p>
+            <div class="table-wrap">
+              <table class="specs">
+                <thead><tr><th>Port</th><th>Parameter</th><th>Range or limit</th></tr></thead>
+                <tbody>
+                  <tr><td rowspan="4"><strong>IN</strong><br>Chassis bus</td><td>Voltage range</td><td>12 to 28 V</td></tr>
+                  <tr><td>Current limit</td><td>−10 to +10 A; programmable in debug mode</td></tr>
+                  <tr><td>Power setting</td><td>−240 to +240 W; programmable in 1 W steps</td></tr>
+                  <tr><td>Reverse-flow voltage limit</td><td>26.2 V if the battery disconnects while reverse power is set</td></tr>
+                  <tr><td rowspan="2"><strong>OUT</strong><br>Supercapacitor</td><td>Voltage range and setting</td><td>5 to 30 V; digitally programmable</td></tr>
+                  <tr><td>Current limit</td><td>−15 to +15 A; fixed limits</td></tr>
+                  <tr><td><strong>Response</strong></td><td>Chassis load-step settling</td><td>&lt;1 ms; 150 μs typical</td></tr>
+                  <tr><td><strong>Performance</strong></td><td>Peak efficiency</td><td>Up to 97%</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p><strong>Power sign:</strong> positive power flows from IN to OUT and charges the bank. Negative power flows from OUT to IN and supports the chassis bus.</p>
+            <div class="reference-figures">
+              <figure>
+                <img src="assets/power-envelope-24v.png" alt="SCV2 power transfer envelope at a 24 volt chassis bus.">
+                <figcaption>Power transfer envelope at a 24 V chassis bus.</figcaption>
+              </figure>
+              <figure>
+                <img src="assets/maximum-power-transfer.png" alt="Maximum SCV2 power transfer by chassis-bus and supercapacitor voltage.">
+                <figcaption>Maximum transfer magnitude across the specified voltage range.</figcaption>
+              </figure>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
   </main>
-  <footer><a href="https://github.com/weiliangng/scv2">Source repository</a></footer>
+
+  <footer class="site-footer">
+    <a class="brand footer-brand" href="index.html"><span class="brand-mark" aria-hidden="true">S2</span><span><strong>SCV2</strong><small>Power when it matters.</small></span></a>
+    <p>Open hardware for ambitious robots.</p>
+    <a href="https://github.com/weiliangng/scv2">View source on GitHub ↗</a>
+  </footer>
 </body>
 </html>
