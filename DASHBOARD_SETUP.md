@@ -147,7 +147,7 @@ It is intentionally unavailable for the UDP listener and for the PA9 external US
 
 ## 8. Build or update the portable executable
 
-After changing `tools/scv2_dashboard.py`, rebuild the executable before committing or distributing the change. From the repository root, run:
+After changing `tools/scv2_dashboard.py`, rebuild the executable locally before testing or distributing the change. From the repository root, run:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-dashboard-exe.ps1
@@ -155,7 +155,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-dashboard-exe.
 
 The script installs PyInstaller in `.venv` if it is missing, packages the dashboard as a single `SCV2 Dashboard.exe` in the repository root, and runs its built-in `--self-test`. Subsequent rebuilds do not need an internet connection. The executable is the only file needed by the target PC. Build it on 64-bit Windows for 64-bit Windows targets; PyInstaller does not cross-compile Windows executables.
 
-The script deliberately replaces the root executable only after PyInstaller succeeds. Its intermediate directories under `tools` are ignored by Git. Review and commit the changed Python source, documentation, and `SCV2 Dashboard.exe` together so the distributed binary matches its source.
+The script deliberately replaces the root executable only after PyInstaller succeeds. Its intermediate directories under `tools` and the root executable are ignored by Git; never commit the binary.
+
+## 9. Publish a dashboard release
+
+The repository's **Release SCV2 Dashboard** GitHub Actions workflow builds the executable on a clean 64-bit Windows runner, runs both self-tests, and attaches the EXE plus a SHA-256 checksum to a GitHub Release. Release assets are outside Git history.
+
+After committing and pushing the dashboard source and documentation changes, create and push a version tag matching `dashboard-v*`:
+
+```powershell
+git tag -a dashboard-v1.0.0 -m "SCV2 Dashboard v1.0.0"
+git push origin dashboard-v1.0.0
+```
+
+The workflow creates (or, on a rerun, updates) the matching GitHub Release. Download `SCV2 Dashboard.exe` and `SCV2 Dashboard.exe.sha256` from that release; retain the checksum with the executable when distributing it. Each version has its own release asset, keeping version history available without adding binaries to Git commits.
 
 ## Troubleshooting
 

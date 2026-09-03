@@ -219,15 +219,17 @@ When connected through the board's USB CDC port with **Enable USB telemetry whil
 
 ### Portable Windows executable
 
-`SCV2 Dashboard.exe` at the repository root is the single-file Windows distribution. It bundles Python, Qt, and pyserial, so a brand-new supported 64-bit Windows installation can run it without Python, a virtual environment, Qt, or CMake. It is an unsigned in-house executable: follow the organisation-approved Windows SmartScreen review path before allowing it to run.
+`SCV2 Dashboard.exe` is the single-file Windows distribution, published as a GitHub Release asset rather than committed to the repository. It bundles Python, Qt, and pyserial, so a brand-new supported 64-bit Windows installation can run it without Python, a virtual environment, Qt, or CMake. It is an unsigned in-house executable: follow the organisation-approved Windows SmartScreen review path before allowing it to run.
 
-When changing `tools/scv2_dashboard.py` or its dependencies, update the binary in the same change. With the project `.venv` installed as described in `DASHBOARD_SETUP.md`, run:
+When changing `tools/scv2_dashboard.py` or its dependencies, rebuild locally before testing or publishing a release. With the project `.venv` installed as described in `DASHBOARD_SETUP.md`, run:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-dashboard-exe.ps1
 ```
 
-This installs PyInstaller in the project virtual environment if needed, creates the one-file executable at `SCV2 Dashboard.exe`, then runs `SCV2 Dashboard.exe --self-test`. Later rebuilds work offline once PyInstaller is installed. `-ExecutionPolicy Bypass` applies only to that one PowerShell process; it does not change the PC policy. Do not distribute or commit a dashboard-source change without rebuilding and checking in the corresponding executable. The command must run on 64-bit Windows to produce the supported 64-bit Windows executable; PyInstaller is not a cross-compiler. Its temporary `tools/dashboard-pyinstaller-*` folders are ignored.
+This installs PyInstaller in the project virtual environment if needed, creates the one-file executable at `SCV2 Dashboard.exe`, then runs `SCV2 Dashboard.exe --self-test`. Later rebuilds work offline once PyInstaller is installed. `-ExecutionPolicy Bypass` applies only to that one PowerShell process; it does not change the PC policy. Do not commit the executable: it is ignored and release assets are kept outside Git history.
+
+To publish a dashboard version, commit and push the source/documentation changes, then push an annotated tag matching `dashboard-v*`, for example `dashboard-v1.0.0`. `.github/workflows/dashboard-release.yml` runs on a clean 64-bit Windows GitHub runner, creates or updates that GitHub Release, and uploads `SCV2 Dashboard.exe` plus `SCV2 Dashboard.exe.sha256`. A rerun replaces only assets on the same release tag; versioned releases retain previous distributable builds without bloating repository history. The workflow uses an x64 Windows runner because PyInstaller is not a cross-compiler. Do not alter the workflow's `contents: write` permission: it is required to create the release and attach assets.
 
 - Continuous fields are shown as live current-value cards; the dashboard does not retain or graph historical samples. Invalid CAN, UART, and manual command values are greyed out rather than shown as zero.
 - Validity and freshness fields are displayed as `VALID`/`INVALID` and `FRESH`/`STALE`; invalid or stale values are grey.

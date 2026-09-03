@@ -7,6 +7,10 @@ tools/dashboard-pyinstaller-work/
 tools/dashboard-pyinstaller-dist/
 tools/dashboard-pyinstaller-spec/
 
+# Published by the dashboard-release workflow; never commit binary release assets.
+SCV2 Dashboard.exe
+SCV2 Dashboard.exe.sha256
+
 # IDE
 .idea/
 
