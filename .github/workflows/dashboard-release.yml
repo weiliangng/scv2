@@ -1,4 +1,4 @@
-name: Release SCV2 Dashboard
+name: Release SCV2
 
 on:
   push:
@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  release-dashboard:
-    name: Build and publish dashboard
+  build-dashboard:
+    name: Build dashboard
     runs-on: windows-latest
 
     steps:
@@ -37,17 +37,91 @@ jobs:
         run: |
           .\.venv\Scripts\python.exe .\tools\scv2_dashboard.py --self-test
           powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-dashboard-exe.ps1
+          New-Item -ItemType Directory -Path .\release-assets -Force | Out-Null
+          Copy-Item -LiteralPath ".\SCV2 Dashboard.exe" -Destination .\release-assets\
+          $hash = (Get-FileHash -LiteralPath ".\SCV2 Dashboard.exe" -Algorithm SHA256).Hash
+          "$hash *SCV2 Dashboard.exe" | Set-Content -LiteralPath ".\release-assets\SCV2 Dashboard.exe.sha256" -Encoding ascii -NoNewline
 
-      - name: Publish release assets
-        shell: pwsh
+      - name: Stage dashboard release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dashboard
+          path: release-assets/
+          if-no-files-found: error
+
+  build-firmware:
+    name: Build firmware
+    runs-on: ubuntu-latest
+    env:
+      ARM_GNU_TOOLCHAIN_VERSION: 14.3.rel1
+      ARM_GNU_TOOLCHAIN_ARCHIVE: arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v6
+
+      - name: Install pinned Arm GNU Toolchain
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 --output "$ARM_GNU_TOOLCHAIN_ARCHIVE" \
+            "https://developer.arm.com/-/media/Files/downloads/gnu/$ARM_GNU_TOOLCHAIN_VERSION/binrel/$ARM_GNU_TOOLCHAIN_ARCHIVE"
+          tar -xf "$ARM_GNU_TOOLCHAIN_ARCHIVE"
+          echo "$GITHUB_WORKSPACE/${ARM_GNU_TOOLCHAIN_ARCHIVE%.tar.xz}/bin" >> "$GITHUB_PATH"
+
+      - name: Configure and build MinSizeRel firmware
+        shell: bash
+        run: |
+          arm-none-eabi-gcc --version
+          cmake --preset MinSizeRel
+          cmake --build --preset MinSizeRel
+
+      - name: Prepare firmware release assets
+        shell: bash
+        run: |
+          mkdir release-assets
+          cp build/MinSizeRel/test.elf release-assets/SCV2_Firmware.elf
+          cp build/MinSizeRel/test.map release-assets/SCV2_Firmware.map
+          arm-none-eabi-objcopy -O binary build/MinSizeRel/test.elf release-assets/SCV2_Firmware.bin
+          arm-none-eabi-objcopy -O ihex build/MinSizeRel/test.elf release-assets/SCV2_Firmware.hex
+          (
+            echo "commit: $GITHUB_SHA"
+            arm-none-eabi-gcc --version | head -n 1
+            cmake --version | head -n 1
+            echo "ninja $(ninja --version)"
+          ) > release-assets/SCV2_Firmware.build.txt
+          (
+            cd release-assets
+            sha256sum SCV2_Firmware.elf SCV2_Firmware.bin SCV2_Firmware.hex SCV2_Firmware.map > SCV2_Firmware.sha256
+          )
+
+      - name: Stage firmware release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-firmware
+          path: release-assets/
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish release
+    needs: [build-dashboard, build-firmware]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v5
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-assets
+
+      - name: Create release and upload assets
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release view $env:RELEASE_TAG 2>$null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $env:RELEASE_TAG --title "SCV2 Dashboard $env:RELEASE_TAG" --generate-notes --verify-tag
-          }
-          $hash = (Get-FileHash -LiteralPath ".\SCV2 Dashboard.exe" -Algorithm SHA256).Hash
-          "$hash *SCV2 Dashboard.exe" | Set-Content -LiteralPath ".\SCV2 Dashboard.exe.sha256" -Encoding ascii -NoNewline
-          gh release upload $env:RELEASE_TAG ".\SCV2 Dashboard.exe" ".\SCV2 Dashboard.exe.sha256" --clobber
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --title "SCV2 $RELEASE_TAG" --generate-notes --verify-tag
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber

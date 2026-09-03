@@ -157,9 +157,9 @@ The script checks for PyInstaller without importing it, installs it in `.venv` w
 
 The script deliberately replaces the root executable only after PyInstaller succeeds. Its intermediate directories under `tools` and the root executable are ignored by Git; never commit the binary.
 
-## 9. Publish a dashboard release
+## 9. Publish an SCV2 release
 
-The repository's **Release SCV2 Dashboard** GitHub Actions workflow builds the executable on a clean 64-bit Windows runner, runs both self-tests, and attaches the EXE plus a SHA-256 checksum to a GitHub Release. Release assets are outside Git history.
+The repository's **Release SCV2** GitHub Actions workflow builds both deliverables from the release tag before creating the GitHub Release. It builds and self-tests the dashboard EXE on a clean 64-bit Windows runner, then builds the MinSizeRel STM32 firmware with pinned Arm GNU Toolchain 14.3.Rel1 on a Linux runner. Release assets are outside Git history.
 
 After committing and pushing the dashboard source and documentation changes, create and push a version tag matching `dashboard-v*`:
 
@@ -168,7 +168,16 @@ git tag -a dashboard-v1.0.0 -m "SCV2 Dashboard v1.0.0"
 git push origin dashboard-v1.0.0
 ```
 
-The workflow creates (or, on a rerun, updates) the matching GitHub Release. Download `SCV2 Dashboard.exe` and `SCV2 Dashboard.exe.sha256` from that release; retain the checksum with the executable when distributing it. Each version has its own release asset, keeping version history available without adding binaries to Git commits.
+The workflow creates (or, on a rerun, updates) the matching GitHub Release. Download `SCV2 Dashboard.exe` and `SCV2 Dashboard.exe.sha256` for the dashboard. Firmware assets are `SCV2_Firmware.elf` (accepted by STM32CubeProgrammer), `.bin`, `.hex`, `.map`, `.build.txt`, and `.sha256`. Retain the checksum files with their deliverables when distributing them. Each version has its own release asset, keeping version history available without adding binaries to Git commits.
+
+To compare the firmware produced locally with the released ELF, build with the `MinSizeRel` preset, then run this for each file:
+
+```powershell
+Get-FileHash -LiteralPath .\build\MinSizeRel\test.elf -Algorithm SHA256
+Get-FileHash -LiteralPath .\SCV2_Firmware.elf -Algorithm SHA256
+```
+
+The release's `SCV2_Firmware.sha256` contains the expected hash. Matching hashes prove the ELF bytes are identical. The CI build metadata records its exact compiler and build-tool versions; compare that file first if the hashes differ.
 
 ## Troubleshooting
 
