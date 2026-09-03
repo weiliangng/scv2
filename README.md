@@ -1,5 +1,6 @@
 # Technical documentation
 
+- [SCV2 website source](website/README.md)
 - [USB CLI setup and usage guide](CLI_GUIDE.md)
 - [Downstream CAN telemetry receiver guide](CAN_TELEMETRY.md)
 - [Dashboard setup and operation](DASHBOARD_SETUP.md)

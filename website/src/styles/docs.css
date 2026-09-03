@@ -1,0 +1,36 @@
+:root {
+  --sl-color-accent-low: #dcece6;
+  --sl-color-accent: #1d6259;
+  --sl-color-accent-high: #123d38;
+  --sl-color-white: #17201d;
+  --sl-color-gray-1: #2c3733;
+  --sl-color-gray-2: #46514d;
+  --sl-color-gray-3: #68736f;
+  --sl-color-gray-4: #a7afac;
+  --sl-color-gray-5: #d9dddb;
+  --sl-color-gray-6: #eef0ef;
+  --sl-color-black: #ffffff;
+  --sl-font: Manrope, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sl-font-mono: "DM Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #123d38;
+  --sl-color-accent: #d8ff4f;
+  --sl-color-accent-high: #edffad;
+  --sl-color-white: #f7f5ef;
+  --sl-color-gray-1: #e4e8e6;
+  --sl-color-gray-2: #bcc5c1;
+  --sl-color-gray-3: #909d98;
+  --sl-color-gray-4: #58645f;
+  --sl-color-gray-5: #303b37;
+  --sl-color-gray-6: #202925;
+  --sl-color-black: #121916;
+}
+
+.site-title { font-weight: 800; letter-spacing: .03em; }
+.sl-markdown-content h1,.sl-markdown-content h2,.sl-markdown-content h3 { letter-spacing: -.025em; }
+.sl-markdown-content table { font-size: .88rem; }
+.sl-markdown-content blockquote { border-inline-start-color: var(--sl-color-accent); background: var(--sl-color-accent-low); }
+.sl-markdown-content code { border-radius: .25rem; }
+.hero > img,.sl-markdown-content img { border: 1px solid var(--sl-color-gray-5); border-radius: .5rem; }

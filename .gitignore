@@ -14,3 +14,8 @@ SCV2 Dashboard.exe.sha256
 # IDE
 .idea/
 
+# Astro documentation website
+website/node_modules/
+website/dist/
+website/.astro/
+

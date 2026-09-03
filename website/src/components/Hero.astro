@@ -1,0 +1,35 @@
+---
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<section class="hero">
+  <div class="hero-copy">
+    <p class="eyebrow"><span></span> Bidirectional energy control for robot chassis</p>
+    <h1>More power<br /><em>when it matters.</em></h1>
+    <p class="hero-lede">SCV2 stores unused chassis power and returns it through hard acceleration, ramps, and transient loads—without asking your control team to become power-electronics specialists.</p>
+    <div class="hero-actions">
+      <a class="button button-primary" href={`${base}/docs/installation/`}>Start integrating <span aria-hidden="true">→</span></a>
+      <a class="button button-secondary" href="#how-it-works">See how it works <span aria-hidden="true">↓</span></a>
+    </div>
+    <ul class="hero-stats" aria-label="Key performance specifications">
+      <li><strong>97%</strong><span>peak efficiency</span></li>
+      <li><strong>150 μs</strong><span>typical settling</span></li>
+      <li><strong>±240 W</strong><span>power control</span></li>
+    </ul>
+  </div>
+
+  <div class="energy-console" aria-label="Example SCV2 operating state">
+    <div class="console-topline"><span class="status-dot"></span> Buffer active <b>LIVE</b></div>
+    <div class="energy-gauge">
+      <span class="gauge-value">1,320</span>
+      <span class="gauge-unit">joules available</span>
+      <span class="gauge-ring" aria-hidden="true"></span>
+    </div>
+    <div class="flow-row">
+      <div><small>CHASSIS BUS</small><strong>24.1 V</strong></div>
+      <span class="flow-line" aria-hidden="true"><i></i><i></i><i></i></span>
+      <div><small>SUPERCAP</small><strong>26.8 V</strong></div>
+    </div>
+    <div class="console-readout"><span>Power assistance</span><strong>−186 W</strong></div>
+  </div>
+</section>

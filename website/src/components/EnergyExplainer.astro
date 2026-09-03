@@ -1,0 +1,49 @@
+---
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<section class="lesson-section" id="how-it-works">
+  <div class="section-heading">
+    <p class="section-kicker">Understand it in three steps</p>
+    <h2>A bigger energy budget,<br />without a bigger learning curve.</h2>
+    <p>SCV2 works alongside the referee system’s virtual buffer. Here is the entire idea.</p>
+  </div>
+
+  <div class="lesson-grid">
+    <article class="lesson-card">
+      <span class="lesson-number">01</span>
+      <p class="lesson-question">The limit</p>
+      <h3>Your chassis has a power budget.</h3>
+      <p>The referee system allows 50–120 W depending on robot level, plus a small 60 J virtual buffer for short bursts.</p>
+      <div class="mini-meter"><span>Allowance</span><span>Burst</span><div><i></i></div></div>
+    </article>
+    <article class="lesson-card featured-lesson">
+      <span class="lesson-number">02</span>
+      <p class="lesson-question">The trade</p>
+      <h3>Extra power spends stored energy.</h3>
+      <p>Draw 60 W above the limit for one second and the referee buffer loses 60 J. Drop below the limit and it refills.</p>
+      <div class="formula"><span>60 W</span><b>×</b><span>1 s</span><b>=</b><strong>60 J</strong></div>
+      <p class="warning-note">An empty referee buffer can trigger a five-second chassis shutdown.</p>
+    </article>
+    <article class="lesson-card">
+      <span class="lesson-number">03</span>
+      <p class="lesson-question">The advantage</p>
+      <h3>SCV2 makes the buffer physical.</h3>
+      <p>Capture surplus power in a supercapacitor and return it on demand, providing roughly 1,200–1,400 J of usable energy.</p>
+      <div class="capacity-bars">
+        <span><small>Referee</small><i style="--fill: 5%"></i><b>60 J</b></span>
+        <span><small>SCV2</small><i style="--fill: 100%"></i><b>~1,300 J</b></span>
+      </div>
+    </article>
+  </div>
+
+  <div class="lesson-diagram">
+    <div>
+      <p class="section-kicker">The control loop</p>
+      <h3>Charge in quiet moments. Assist in demanding ones.</h3>
+      <p>Below the power limit, unused allowance charges the bank. Above it, SCV2 supplies the difference and presents a steadier load to the referee system.</p>
+      <a href={`${base}/docs/operating-envelope/`}>Explore the operating envelope →</a>
+    </div>
+    <img src={`${base}/assets/chassis.png`} alt="Chassis power crossing the referee limit: surplus energy charges the buffer and stored energy supports power spikes." />
+  </div>
+</section>

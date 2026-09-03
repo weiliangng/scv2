@@ -1,0 +1,58 @@
+---
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<section class="features-section" id="features">
+  <div class="section-heading feature-heading">
+    <p class="section-kicker">Competition-ready power electronics</p>
+    <h2>High performance.<br />Low integration friction.</h2>
+    <p>Fast regulation, practical control interfaces, and layered protection designed around real robots—not ideal benches.</p>
+  </div>
+
+  <div class="feature-grid">
+    <article class="feature-card feature-primary">
+      <span class="feature-icon" aria-hidden="true">↗</span>
+      <p class="feature-label">Transient response</p>
+      <h3>Responds before the chassis feels the dip.</h3>
+      <p>Typical 150 μs load-step settling keeps assistance controlled through sudden demand changes.</p>
+      <strong class="big-number">150 <small>μs typical</small></strong>
+    </article>
+    <article class="feature-card">
+      <span class="feature-icon" aria-hidden="true">⇄</span>
+      <p class="feature-label">Bidirectional control</p>
+      <h3>One converter.<br />Both directions.</h3>
+      <p>Constant input-power regulation and CC/CV charging move energy wherever it is needed.</p>
+    </article>
+    <article class="feature-card">
+      <span class="feature-icon" aria-hidden="true">⌁</span>
+      <p class="feature-label">Open interfaces</p>
+      <h3>CAN, UART, USB and live telemetry.</h3>
+      <p>Integrate with the robot, diagnose in the pit, and inspect live state through the dashboard.</p>
+    </article>
+    <article class="feature-card feature-wide">
+      <div>
+        <span class="feature-icon" aria-hidden="true">◇</span>
+        <p class="feature-label">Protection</p>
+        <h3>Prepared for imperfect moments.</h3>
+      </div>
+      <ul>
+        <li>Short-circuit current limiting</li>
+        <li>Overvoltage shutdown on both ports</li>
+        <li>Input undervoltage lockout</li>
+        <li>Capacitor degradation detection</li>
+        <li>No unintended backfeeding</li>
+      </ul>
+    </article>
+  </div>
+
+  <div class="proof-strip">
+    <p><span class="status-dot"></span> Operating range</p>
+    <dl>
+      <div><dt>Chassis input</dt><dd>12–28 V</dd></div>
+      <div><dt>Supercapacitor</dt><dd>5–30 V</dd></div>
+      <div><dt>Port current</dt><dd>±10 A / ±15 A</dd></div>
+      <div><dt>Power control</dt><dd>−240 to +240 W</dd></div>
+    </dl>
+    <a href={`${base}/docs/specifications/`}>Read full specifications →</a>
+  </div>
+</section>

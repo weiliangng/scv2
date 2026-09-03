@@ -1,0 +1,40 @@
+---
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const links = [
+  ['01', 'Install the hardware', 'Mounting, wiring, safety, and commissioning.', '/docs/installation/'],
+  ['02', 'Technical specifications', 'Electrical limits, response, efficiency, and protection.', '/docs/specifications/'],
+  ['03', 'Integrate the API', 'CAN, referee UART, telemetry UART, and USB CLI.', '/api/overview/'],
+  ['04', 'Debug in the field', 'Dashboard workflows, diagnostics, and common faults.', '/operations/debugging/'],
+];
+---
+
+<section class="docs-cta" id="documentation">
+  <div class="docs-window">
+    <aside>
+      <p><span>S2</span> SCV2 Docs</p>
+      <small>START HERE</small>
+      <a class="active" href={`${base}/docs/introduction/`}>Introduction</a>
+      <a href={`${base}/docs/installation/`}>Installation</a>
+      <small>HARDWARE</small>
+      <a href={`${base}/docs/specifications/`}>Specifications</a>
+      <a href={`${base}/docs/operating-envelope/`}>Operating envelope</a>
+      <small>API REFERENCE</small>
+      <a href={`${base}/api/overview/`}>Interfaces</a>
+      <a href={`${base}/api/can-telemetry/`}>CAN telemetry</a>
+      <a href={`${base}/api/usb-cli/`}>USB CLI</a>
+    </aside>
+    <div class="docs-preview">
+      <p class="breadcrumb">Docs <span>/</span> Introduction</p>
+      <h2>Build with SCV2</h2>
+      <p class="docs-lede">A structured reference for installing the hardware, integrating robot control, and diagnosing the converter.</p>
+      <div class="docs-note"><strong>New integration?</strong> Start with the installation checklist, then choose the interface your robot will use.</div>
+      <div class="docs-links">
+        {links.map(([number, title, description, href]) => (
+          <a href={`${base}${href}`}>
+            <span>{number}</span><strong>{title}</strong><small>{description}</small><b>Open guide →</b>
+          </a>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
