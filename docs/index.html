@@ -43,7 +43,7 @@
     <p><strong>Port convention:</strong> IN is the chassis-bus side and OUT is the supercapacitor side. Since power flow is bidirectional, each port can source or sink power.</p>
     <table class="specs">
       <thead>
-        <tr><th>Port</th><th>Parameter</th><th>Range or limit</th></tr>
+        <tr><th>Section</th><th>Parameter</th><th>Range or limit</th></tr>
       </thead>
       <tbody>
         <tr><td rowspan="4"><strong>IN</strong><br>Chassis bus</td><td>Voltage range</td><td>12 to 28 V</td></tr>
@@ -52,6 +52,7 @@
         <tr><td>Reverse-flow voltage limit</td><td>26.2 V if the battery is disconnected or shuts down while reverse power is set</td></tr>
         <tr><td rowspan="2"><strong>OUT</strong><br>Supercapacitor</td><td>Voltage range and setting</td><td>5 to 30 V; digitally programmable</td></tr>
         <tr><td>Current limit</td><td>-15 to +15 A; fixed limits</td></tr>
+        <tr><td><strong>Response</strong></td><td>Chassis load-step settling time</td><td>&lt;1 ms; 150 &micro;s typical</td></tr>
       </tbody>
     </table>
     <p><strong>Power sign:</strong> positive power flows from IN to OUT and charges the bank. Negative power flows from OUT to IN and supports the chassis bus.</p>
