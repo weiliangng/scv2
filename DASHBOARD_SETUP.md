@@ -153,7 +153,7 @@ After changing `tools/scv2_dashboard.py`, rebuild the executable locally before 
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-dashboard-exe.ps1
 ```
 
-The script installs PyInstaller in `.venv` if it is missing, packages the dashboard as a single `SCV2 Dashboard.exe` in the repository root, and runs its built-in `--self-test`. Subsequent rebuilds do not need an internet connection. The executable is the only file needed by the target PC. Build it on 64-bit Windows for 64-bit Windows targets; PyInstaller does not cross-compile Windows executables.
+The script checks for PyInstaller without importing it, installs it in `.venv` when missing, packages the dashboard as a single `SCV2 Dashboard.exe` in the repository root, and runs its built-in `--self-test`. Subsequent rebuilds do not need an internet connection. The executable is the only file needed by the target PC. Build it on 64-bit Windows for 64-bit Windows targets; PyInstaller does not cross-compile Windows executables.
 
 The script deliberately replaces the root executable only after PyInstaller succeeds. Its intermediate directories under `tools` and the root executable are ignored by Git; never commit the binary.
 

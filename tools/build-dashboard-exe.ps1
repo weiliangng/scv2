@@ -17,8 +17,11 @@ if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
     throw "Dashboard Python environment was not found: $pythonPath. Create .venv and install tools/requirements-dashboard.txt first."
 }
 
-& $pythonPath -m PyInstaller --version *> $null
+$pyInstallerInstalled = (& $pythonPath -c "import importlib.util; print(int(importlib.util.find_spec('PyInstaller') is not None))").Trim()
 if ($LASTEXITCODE -ne 0) {
+    throw "Could not check whether PyInstaller is installed."
+}
+if ($pyInstallerInstalled -ne "1") {
     & $pythonPath -m pip install pyinstaller
     if ($LASTEXITCODE -ne 0) {
         throw "PyInstaller installation failed."
