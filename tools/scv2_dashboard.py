@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Live, read-only visualizer for the SCV2 T1 telemetry stream.
+"""Live SCV2 T1 telemetry dashboard with an optional USB CDC CLI.
 
 The authoritative CSV field contract is ``agent.md`` in the repository root.
 This program deliberately accepts only that fixed T1 schema.
@@ -153,25 +153,79 @@ class NewlineStreamParser:
 
 
 class SerialReader(threading.Thread):
+    CLI_PROMPT = b"scv2> "
+    CLI_TIMEOUT_SECONDS = 5.0
+
     def __init__(self, port: str, baud: int, enable_telemetry: bool, events: queue.Queue) -> None:
         super().__init__(name="scv2-serial-reader", daemon=True)
         self.port, self.baud, self.enable_telemetry, self.events = port, baud, enable_telemetry, events
         self.stop_requested = threading.Event()
+        self.commands: queue.Queue[str] = queue.Queue()
         self._serial: serial.Serial | None = None
         self._started_telemetry = False
 
     def stop(self) -> None:
         self.stop_requested.set()
 
+    def submit_command(self, command: str) -> None:
+        """Schedule one USB CDC command; all serial I/O remains on this thread."""
+        self.commands.put(command)
+
+    def _write_cli(self, command: str) -> None:
+        assert self._serial is not None
+        self._serial.write(command.encode("utf-8") + b"\r\n")
+        self._serial.flush()
+
+    def _read_cli_response(self) -> str:
+        """Read through the CLI prompt, which is the firmware's command-complete marker."""
+        assert self._serial is not None
+        deadline = time.monotonic() + self.CLI_TIMEOUT_SECONDS
+        response = bytearray()
+        while time.monotonic() < deadline:
+            if self.stop_requested.is_set():
+                raise InterruptedError("Disconnected while waiting for the CLI response.")
+            chunk = self._serial.read(256)
+            if chunk:
+                response.extend(chunk)
+                if self.CLI_PROMPT in response:
+                    return response.decode("utf-8", errors="replace")
+        raise TimeoutError(f"No CLI prompt received within {self.CLI_TIMEOUT_SECONDS:g} seconds.")
+
+    def _run_command(self, command: str) -> None:
+        """Pause the USB telemetry mirror, execute one command, then restore it."""
+        response = ""
+        error: str | None = None
+        try:
+            if self._started_telemetry:
+                self._write_cli("telemetry off")
+                self._read_cli_response()
+            self._write_cli(command)
+            response = self._read_cli_response()
+        except (OSError, serial.SerialException, TimeoutError, InterruptedError) as exc:
+            error = str(exc)
+        finally:
+            if self._started_telemetry and not self.stop_requested.is_set():
+                try:
+                    self._write_cli("telemetry on")
+                except (OSError, serial.SerialException) as exc:
+                    error = error or f"Could not restore USB telemetry: {exc}"
+        self.events.put(("command_result", command, response, error))
+
     def run(self) -> None:
         try:
             self._serial = serial.Serial(self.port, self.baud, timeout=0.2, write_timeout=0.5)
             if self.enable_telemetry:
-                self._serial.write(b"telemetry on\r\n")
-                self._serial.flush()
+                self._write_cli("telemetry on")
                 self._started_telemetry = True
             self.events.put(("connected", self.port))
             while not self.stop_requested.is_set():
+                try:
+                    command = self.commands.get_nowait()
+                except queue.Empty:
+                    command = None
+                if command is not None:
+                    self._run_command(command)
+                    continue
                 # readline() returns as soon as a telemetry newline arrives.  In
                 # contrast, read(4096) waits for a large batch or the serial
                 # timeout, which adds visible latency to the dashboard.
@@ -185,8 +239,7 @@ class SerialReader(threading.Thread):
             if self._serial is not None:
                 try:
                     if self._started_telemetry:
-                        self._serial.write(b"telemetry off\r\n")
-                        self._serial.flush()
+                        self._write_cli("telemetry off")
                     self._serial.close()
                 except (OSError, serial.SerialException):
                     pass
@@ -263,6 +316,7 @@ class Dashboard(QtWidgets.QMainWindow):
         self.listen_started_time: float | None = None
         self.last_sender: tuple[str, int] | None = None
         self.connection_error: str | None = None
+        self.serial_connected = False
         self.demo_sequence = 0
         self.last_sample: dict[str, int] | None = None
         self.last_seq: int | None = None
@@ -351,6 +405,7 @@ class Dashboard(QtWidgets.QMainWindow):
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.addTab(self._live_values_page(), "Live values")
         self.tabs.addTab(self._status_page(), "Status")
+        self.tabs.addTab(self._command_page(), "USB CLI")
         root_layout.addWidget(self.tabs)
         self.update_transport_controls()
 
@@ -366,6 +421,17 @@ class Dashboard(QtWidgets.QMainWindow):
         self.auto_telemetry.setEnabled(not udp and not connected)
         self.udp_port.setEnabled(udp and not connected)
         self.transport_combo.setEnabled(not connected)
+        command_available = self.serial_connected and self.auto_telemetry.isChecked()
+        self.command_input.setEnabled(command_available)
+        self.command_button.setEnabled(command_available)
+        if command_available:
+            self.command_hint.setText("Telemetry is paused only while the command runs, then restored automatically.")
+        elif udp:
+            self.command_hint.setText("USB CLI commands are unavailable for the UDP listener.")
+        elif connected:
+            self.command_hint.setText("Commands require Enable USB telemetry while connected, selected before connecting.")
+        else:
+            self.command_hint.setText("Connect through USB serial with USB telemetry enabled to send a CLI command.")
 
     def _card_grid(self, title: str, names: list[str], columns: int = 4) -> QtWidgets.QGroupBox:
         box = QtWidgets.QGroupBox(title)
@@ -407,6 +473,49 @@ class Dashboard(QtWidgets.QMainWindow):
         states.addWidget(self._card_grid("UART and manual", ["uart_p_valid", "uart_p_fresh", "uart_e_valid", "uart_e_fresh", "uart_swen_req", "man_p_valid", "man_swen", "man_swen_valid", "btn_swen", "btn_swen_valid"]), 1, 1)
         return page
 
+    def _command_page(self) -> QtWidgets.QWidget:
+        page = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(page)
+        warning = QtWidgets.QLabel(
+            "Commands are sent only over the SCV2 USB CDC connection. They can change hardware state; use a safe bench setup."
+        )
+        warning.setWordWrap(True)
+        warning.setStyleSheet("font-weight: 700; color: #b45309;")
+        self.command_hint = QtWidgets.QLabel()
+        self.command_hint.setWordWrap(True)
+        command_row = QtWidgets.QHBoxLayout()
+        self.command_input = QtWidgets.QLineEdit()
+        self.command_input.setPlaceholderText("For example: status")
+        self.command_input.returnPressed.connect(self.send_command)
+        self.command_button = QtWidgets.QPushButton("Send command")
+        self.command_button.clicked.connect(self.send_command)
+        command_row.addWidget(QtWidgets.QLabel("SCV2 CLI command"))
+        command_row.addWidget(self.command_input, 1)
+        command_row.addWidget(self.command_button)
+        self.command_result = QtWidgets.QPlainTextEdit()
+        self.command_result.setReadOnly(True)
+        self.command_result.setPlaceholderText("Command responses appear here.")
+        layout.addWidget(warning)
+        layout.addWidget(self.command_hint)
+        layout.addLayout(command_row)
+        layout.addWidget(self.command_result, 1)
+        return page
+
+    def send_command(self) -> None:
+        command = self.command_input.text().strip()
+        if not command:
+            return
+        if "\r" in command or "\n" in command:
+            QtWidgets.QMessageBox.warning(self, "One command at a time", "Enter one SCV2 CLI command without a line break.")
+            return
+        if not isinstance(self.reader, SerialReader) or not self.serial_connected or not self.auto_telemetry.isChecked():
+            return
+        self.command_input.clear()
+        self.command_input.setEnabled(False)
+        self.command_button.setEnabled(False)
+        self.command_hint.setText(f"Running: {command}")
+        self.reader.submit_command(command)
+
     def refresh_ports(self) -> None:
         selected = self.port_combo.currentText()
         self.port_combo.clear()
@@ -427,6 +536,8 @@ class Dashboard(QtWidgets.QMainWindow):
         if self.reader is not None:
             self.reader.stop()
             self.connect_button.setEnabled(False)
+            self.command_input.setEnabled(False)
+            self.command_button.setEnabled(False)
             return
         self.stream_parser = NewlineStreamParser()
         self.packet_count = 0
@@ -474,6 +585,8 @@ class Dashboard(QtWidgets.QMainWindow):
                     latest_sample = sample
             elif event == "connected":
                 self.connection.setText(f"Connected: {data}")
+                self.serial_connected = isinstance(self.reader, SerialReader)
+                self.update_transport_controls()
             elif event == "error":
                 self.connection_error = data
                 self.connection.setText(f"Error: {data}")
@@ -481,8 +594,19 @@ class Dashboard(QtWidgets.QMainWindow):
                 self.packet_status.setStyleSheet("font-weight: 700; color: #b91c1c;")
             elif event == "parse_error":
                 self.connection.setText(f"Ignored malformed telemetry: {data}")
+            elif event == "command_result":
+                command, response, error = data, extra[0], extra[1]
+                if error is None:
+                    clean_response = response.replace("scv2> ", "").strip()
+                    self.command_result.appendPlainText(f"> {command}\n{clean_response or '(no response)'}\n")
+                    self.command_hint.setText("Command complete; USB telemetry restored.")
+                else:
+                    self.command_result.appendPlainText(f"> {command}\nERROR: {error}\n")
+                    self.command_hint.setText("Command failed; attempted to restore USB telemetry.")
+                self.update_transport_controls()
             elif event == "disconnected":
                 self.reader = None
+                self.serial_connected = False
                 self.connect_button.setEnabled(True)
                 self.connect_button.setText("Connect")
                 if not self.args.demo and self.connection_error is None:
@@ -625,6 +749,21 @@ def enum_text(values: tuple[str, ...], value: int) -> str:
 
 
 def self_test() -> None:
+    class FakeSerial:
+        def __init__(self, chunks: list[bytes]) -> None:
+            self.chunks = deque(chunks)
+            self.writes: list[bytes] = []
+
+        def write(self, data: bytes) -> int:
+            self.writes.append(data)
+            return len(data)
+
+        def flush(self) -> None:
+            pass
+
+        def read(self, _size: int) -> bytes:
+            return self.chunks.popleft() if self.chunks else b""
+
     values = demo_sample(42)
     line = "T1," + ",".join(str(values[field.name]) for field in FIELDS)
     parsed = parse_t1(line)
@@ -642,7 +781,15 @@ def self_test() -> None:
     assert stream.feed(b"CLI ready\nT1,1") == [b"CLI ready"]
     assert stream.feed(b",2\r\nlast") == [b"T1,1,2\r"]
     assert stream.feed(b" message\n") == [b"last message"]
-    print("T1 parser, UDP stream buffering, and state-display self-test passed.")
+    command_events: queue.Queue = queue.Queue()
+    command_reader = SerialReader("COM1", 115200, True, command_events)
+    fake_serial = FakeSerial([b"ok\r\nscv2> ", b"status output\r\nscv2> "])
+    command_reader._serial = fake_serial  # Test the serial-thread transaction without hardware.
+    command_reader._started_telemetry = True
+    command_reader._run_command("status")
+    assert fake_serial.writes == [b"telemetry off\r\n", b"status\r\n", b"telemetry on\r\n"]
+    assert command_events.get_nowait() == ("command_result", "status", "status output\r\nscv2> ", None)
+    print("T1 parser, UDP stream buffering, USB CLI transaction, and state-display self-test passed.")
 
 
 def main() -> int:

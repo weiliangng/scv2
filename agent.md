@@ -211,9 +211,23 @@ In external mode, fresh UART power plus energy wins; otherwise fresh CAN is used
 
 ### Local dashboard
 
-`tools/scv2_dashboard.py` is the read-only local viewer for this exact `T1` schema. It consumes only complete records with all 69 columns and ignores ordinary CLI output. Its field order is intentionally tied to this document.
+`tools/scv2_dashboard.py` is the local viewer for this exact `T1` schema. It consumes only complete records with all 69 columns and ignores ordinary CLI output. Its field order is intentionally tied to this document.
 
 For fresh Python installation, dependency setup, connection instructions, and troubleshooting, follow [`DASHBOARD_SETUP.md`](DASHBOARD_SETUP.md).
+
+When connected through the board's USB CDC port with **Enable USB telemetry while connected** selected, the dashboard's **USB CLI** tab can send one command at a time. It sends `telemetry off`, waits for the `scv2> ` prompt, sends the entered command, waits for that command's prompt, then sends `telemetry on`; the response is shown in the tab. This is unavailable for UDP and for serial links with USB telemetry disabled, including the receive-only PA9 USB-UART setup. CLI commands can mutate hardware, so use the same safe-bench constraints as a serial terminal.
+
+### Portable Windows executable
+
+`SCV2 Dashboard.exe` at the repository root is the single-file Windows distribution. It bundles Python, Qt, and pyserial, so a brand-new supported 64-bit Windows installation can run it without Python, a virtual environment, Qt, or CMake. It is an unsigned in-house executable: follow the organisation-approved Windows SmartScreen review path before allowing it to run.
+
+When changing `tools/scv2_dashboard.py` or its dependencies, update the binary in the same change. With the project `.venv` installed as described in `DASHBOARD_SETUP.md`, run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-dashboard-exe.ps1
+```
+
+This installs PyInstaller in the project virtual environment if needed, creates the one-file executable at `SCV2 Dashboard.exe`, then runs `SCV2 Dashboard.exe --self-test`. Later rebuilds work offline once PyInstaller is installed. `-ExecutionPolicy Bypass` applies only to that one PowerShell process; it does not change the PC policy. Do not distribute or commit a dashboard-source change without rebuilding and checking in the corresponding executable. The command must run on 64-bit Windows to produce the supported 64-bit Windows executable; PyInstaller is not a cross-compiler. Its temporary `tools/dashboard-pyinstaller-*` folders are ignored.
 
 - Continuous fields are shown as live current-value cards; the dashboard does not retain or graph historical samples. Invalid CAN, UART, and manual command values are greyed out rather than shown as zero.
 - Validity and freshness fields are displayed as `VALID`/`INVALID` and `FRESH`/`STALE`; invalid or stale values are grey.

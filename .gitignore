@@ -2,6 +2,11 @@
 build/
 cmake-build-*/
 
+# Recreated by tools/build-dashboard-exe.ps1.
+tools/dashboard-pyinstaller-work/
+tools/dashboard-pyinstaller-dist/
+tools/dashboard-pyinstaller-spec/
+
 # IDE
 .idea/
 

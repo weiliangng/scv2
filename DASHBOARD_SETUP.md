@@ -1,8 +1,10 @@
 # SCV2 dashboard setup and operation
 
-This guide starts from a Windows PC with no Python packages installed. The dashboard uses a project-local Python virtual environment, so it does not modify the global Python package installation.
+For normal use, copy `SCV2 Dashboard.exe` to any Windows 10 or 11 PC and run it directly. It bundles the dashboard, Python, Qt, and pyserial; Python, Qt, CMake, and an internet connection are not required on the target PC. Windows may show a SmartScreen warning for an unsigned in-house executable; use the normal organisation-approved review path before choosing **More info** then **Run anyway**.
 
-## Requirements
+The remaining sections describe the Python development setup and how to rebuild the executable after changing the dashboard.
+
+## Development requirements
 
 - Windows 10 or 11
 - 64-bit Python 3.10 through 3.14; Python 3.14 is recommended
@@ -86,7 +88,7 @@ To inspect the UI without hardware:
 
 Close the demo window before connecting hardware.
 
-## 6. Start the dashboard
+## 6. Start the dashboard from source
 
 After the one-time setup, either double-click `Start SCV2 Dashboard.cmd` or run:
 
@@ -136,6 +138,24 @@ The firmware continuously transmits the same T1 stream from USART1 TX on PA9 at 
 3. Allow Python through Windows Firewall for the appropriate network profile if prompted.
 
 The dashboard only binds and listens. It does not discover the bridge, send a reply, or require UDP datagrams to align with T1 record boundaries.
+
+### USB CLI commands from the dashboard
+
+The **USB CLI** tab is available only while connected to the board's USB CDC port with **Enable USB telemetry while connected** selected. Enter one command, such as `status`, and click **Send command**. The dashboard pauses its USB telemetry mirror with `telemetry off`, waits for the CLI prompt, sends the command, waits for the command to finish at the next prompt, then restores telemetry with `telemetry on`. The response is displayed in the tab.
+
+It is intentionally unavailable for the UDP listener and for the PA9 external USB-UART receiver. Treat dashboard commands exactly like commands typed in a serial terminal: `ctrl direct`, `gpio`, `dac`, and calibration commands can mutate hardware, so use a safe, current-limited bench setup and follow the constraints in `agent.md`.
+
+## 8. Build or update the portable executable
+
+After changing `tools/scv2_dashboard.py`, rebuild the executable before committing or distributing the change. From the repository root, run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-dashboard-exe.ps1
+```
+
+The script installs PyInstaller in `.venv` if it is missing, packages the dashboard as a single `SCV2 Dashboard.exe` in the repository root, and runs its built-in `--self-test`. Subsequent rebuilds do not need an internet connection. The executable is the only file needed by the target PC. Build it on 64-bit Windows for 64-bit Windows targets; PyInstaller does not cross-compile Windows executables.
+
+The script deliberately replaces the root executable only after PyInstaller succeeds. Its intermediate directories under `tools` are ignored by Git. Review and commit the changed Python source, documentation, and `SCV2 Dashboard.exe` together so the distributed binary matches its source.
 
 ## Troubleshooting
 
@@ -197,4 +217,3 @@ Copy `dashboard-wheels` with the repository to the offline PC. After creating `.
 ```powershell
 .\.venv\Scripts\python.exe -m pip install --no-index --find-links .\dashboard-wheels -r .\tools\requirements-dashboard.txt
 ```
-

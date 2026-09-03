@@ -1,11 +1,17 @@
 @echo off
 setlocal
 
+set "DASHBOARD_EXE=%~dp0SCV2 Dashboard.exe"
 set "DASHBOARD_PY=%~dp0.venv\Scripts\python.exe"
 set "DASHBOARD_GUIDE=%~dp0DASHBOARD_SETUP.md"
 
+if exist "%DASHBOARD_EXE%" (
+  "%DASHBOARD_EXE%" %*
+  exit /b %ERRORLEVEL%
+)
+
 if not exist "%DASHBOARD_PY%" (
-  echo SCV2 dashboard Python environment was not found.
+  echo SCV2 Dashboard.exe and the dashboard Python environment were not found.
   echo.
   echo Follow the setup guide:
   echo   "%DASHBOARD_GUIDE%"
