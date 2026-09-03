@@ -20,7 +20,25 @@
   </header>
   <main>
     <h1>SCV2 supercapacitor controller</h1>
-    <p>SCV2 controls a robot supercapacitor bank and reports its operating state.</p>
+    <p>SCV2 manages a physical energy buffer for power-limited robot chassis motors.</p>
+
+    <h2>Why an energy buffer is needed</h2>
+    <p>The referee system limits chassis motor power from 50 W to 120 W across robot levels 1 to 10. It also provides a 60 J virtual power buffer for short periods above that limit.</p>
+    <p>When chassis power exceeds the limit, the virtual buffer drains by the excess power. For example, 60 W above the limit consumes 60 J in one second. When chassis power is below the limit, the unused allowance refills the buffer.</p>
+    <p>If a level 1 robot stops moving, the full 50 W allowance is available. The ideal refill time is:</p>
+    <p><code>60 J / 50 W = 1.2 s</code></p>
+    <p>A depleted buffer can trigger a competition penalty. The exact penalty depends on the current rules; examples include HP loss or a temporary chassis shutdown.</p>
+
+    <figure>
+      <img src="assets/chassis.png" alt="Chassis power draw crossing the referee power limit. Power above the limit consumes stored energy, while power below the limit provides surplus energy for charging.">
+      <figcaption>Chassis power above and below the referee limit during a match.</figcaption>
+    </figure>
+
+    <h2>The physical buffer</h2>
+    <p>SCV2 combines a supercapacitor bank of up to 2000 J with a bidirectional switching converter. It is intended to behave like a larger version of the referee system's virtual buffer.</p>
+    <p>Chassis power is measured from voltage and current. When chassis power is below the referee limit, SCV2 uses the surplus to charge the capacitor bank. When chassis power exceeds the limit, the bank supplies the difference.</p>
+    <p>The converter supports constant input-power regulation and CC/CV charging. After conversion losses and operating limits, the expected usable energy is about 1200 to 1400 J. This supports short loads such as acceleration, ramps, and slopes without depleting the referee buffer as quickly.</p>
+
     <h2>Purpose</h2>
     <p>Manage power flow while applying voltage, fault, command-timeout, and switching protections.</p>
     <h2>Features</h2>
