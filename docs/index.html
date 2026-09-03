@@ -39,16 +39,52 @@
     <p>Chassis power is measured from voltage and current. When chassis power is below the referee limit, SCV2 uses the surplus to charge the capacitor bank. When chassis power exceeds the limit, the bank supplies the difference.</p>
     <p>The converter supports constant input-power regulation and CC/CV charging. After conversion losses and operating limits, the expected usable energy is about 1200 to 1400 J. This supports short loads such as acceleration, ramps, and slopes without depleting the referee buffer as quickly.</p>
 
-    <h2>Purpose</h2>
-    <p>Manage power flow while applying voltage, fault, command-timeout, and switching protections.</p>
-    <h2>Features</h2>
+    <h2>Specifications</h2>
+    <p><strong>Port convention:</strong> IN is the chassis-bus side and OUT is the supercapacitor side. Since power flow is bidirectional, each port can source or sink power.</p>
+    <table class="specs">
+      <thead>
+        <tr><th>Port</th><th>Parameter</th><th>Range or limit</th></tr>
+      </thead>
+      <tbody>
+        <tr><td rowspan="4"><strong>IN</strong><br>Chassis bus</td><td>Voltage range</td><td>12 to 28 V</td></tr>
+        <tr><td>Current limit</td><td>-10 to +10 A; programmable in debug mode</td></tr>
+        <tr><td>Power setting</td><td>-240 to +240 W; programmable in 1 W steps</td></tr>
+        <tr><td>Reverse-flow voltage limit</td><td>26.2 V if the battery is disconnected or shuts down while reverse power is set</td></tr>
+        <tr><td rowspan="2"><strong>OUT</strong><br>Supercapacitor</td><td>Voltage range and setting</td><td>5 to 30 V; digitally programmable</td></tr>
+        <tr><td>Current limit</td><td>-15 to +15 A; fixed limits</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Power sign:</strong> positive power flows from IN to OUT and charges the bank. Negative power flows from OUT to IN and supports the chassis bus.</p>
+
+    <figure>
+      <img src="assets/power-envelope-24v.png" alt="SCV2 power transfer envelope at a 24 volt chassis bus. Transfer is limited by 15 amp supercapacitor current below 16 volts and by 240 watts above 16 volts.">
+      <figcaption>Power transfer envelope at a 24 V chassis bus.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="assets/maximum-power-transfer.png" alt="Maximum SCV2 power transfer by chassis-bus voltage and supercapacitor voltage, showing input-current, output-current, and 240 watt limits.">
+      <figcaption>Maximum transfer magnitude across the specified voltage range.</figcaption>
+    </figure>
+
+    <h2>Protection and fault handling</h2>
+    <p class="notice">The hardware is designed to tolerate these events, but they are not recommended operating procedures.</p>
     <ul>
-      <li>Referee UART and CAN control inputs</li>
-      <li>CAN and UART telemetry</li>
-      <li>USB command-line interface</li>
-      <li>Desktop telemetry dashboard</li>
-      <li>Capacitor health monitoring</li>
+      <li>Hot-plugging the power source</li>
+      <li>Hot-plugging a charged or discharged supercapacitor bank</li>
+      <li>Short-circuit current limiting</li>
+      <li>Overvoltage detection and shutdown on both ports</li>
+      <li>IN-port undervoltage lockout</li>
+      <li>Capacitor degradation detection with charge-voltage foldback when added energy does not produce the expected voltage rise</li>
     </ul>
+
+    <h2>Features</h2>
+    <ol>
+      <li>Robot-independent UART and CAN interfaces</li>
+      <li><a href="debugging.html">USB CLI</a> for field debugging and manual bank-capacity testing</li>
+      <li><a href="debugging.html">Telemetry dashboard</a> over wired USB serial or Wi-Fi UDP; Wi-Fi requires an additional transmitter</li>
+      <li>Normal installation does not require individual board calibration after initial flashing and soldering</li>
+      <li>No unintended backfeeding or "zombie power"; no isolation relay required</li>
+    </ol>
     <h2>Documentation</h2>
     <ul>
       <li><a href="installation.html">Physical installation</a></li>
