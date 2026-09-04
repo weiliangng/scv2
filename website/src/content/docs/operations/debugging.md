@@ -60,6 +60,6 @@ A complete capacity-test procedure and pass criteria are not yet published. Do n
 
 ## Further reference
 
-- [Dashboard setup and operation](https://github.com/weiliangng/scv2/blob/main/DASHBOARD_SETUP.md)
+- [Dashboard setup and operation](https://github.com/weiliangng/scv2-dashboard)
 - [Complete USB CLI guide](https://github.com/weiliangng/scv2/blob/main/CLI_GUIDE.md)
 - [Advanced firmware and telemetry reference](https://github.com/weiliangng/scv2/blob/main/agent.md)

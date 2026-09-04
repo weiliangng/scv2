@@ -151,7 +151,8 @@ Controls the `T1` telemetry mirror on the same USB connection as the CLI:
 
 This command never stops the separate, always-on USART1 telemetry output. When USB telemetry is enabled, `T1,...` CSV lines are expected to appear between the prompt and command responses.
 
-For a graphical telemetry view, use the separate [dashboard setup and operation guide](DASHBOARD_SETUP.md).
+For a graphical telemetry view, use the separate
+[SCV2 dashboard repository](https://github.com/weiliangng/scv2-dashboard).
 
 ### `ctrl`
 
@@ -420,6 +421,6 @@ The physical `Switch enable output (SWEN) pin` line is the relevant confirmation
 
 ## Related documentation
 
-- [SCV2 dashboard setup and operation](DASHBOARD_SETUP.md)
+- [SCV2 dashboard](https://github.com/weiliangng/scv2-dashboard)
 - [Downstream CAN telemetry receiver guide](CAN_TELEMETRY.md)
 - [`agent.md`](agent.md), the advanced firmware, telemetry, and bench-test reference

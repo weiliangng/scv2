@@ -41,4 +41,5 @@ Configure the bridge to forward raw UART telemetry to UDP port `14551` on the da
 The dashboard, PuTTY, CLion's serial monitor, and other serial tools cannot normally share the same COM port. Disconnect one before opening another.
 :::
 
-For development setup, executable packaging, and transport troubleshooting, see the canonical [dashboard guide](https://github.com/weiliangng/scv2/blob/main/DASHBOARD_SETUP.md).
+For development setup, executable packaging, and transport troubleshooting,
+see the canonical [dashboard repository](https://github.com/weiliangng/scv2-dashboard).

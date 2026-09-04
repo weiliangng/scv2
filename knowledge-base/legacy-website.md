@@ -127,7 +127,8 @@ The original page linked to `CAN_TELEMETRY.md` for the receiver guide.
 
 The dashboard displays the 69-field `T1` telemetry record. It supports USB serial, external UART, and UDP input.
 
-The original page linked to `DASHBOARD_SETUP.md` for dashboard setup.
+The original page linked to a dashboard setup guide that has since moved to
+the separate [`scv2-dashboard` repository](https://github.com/weiliangng/scv2-dashboard).
 
 ### Bank capacity
 
