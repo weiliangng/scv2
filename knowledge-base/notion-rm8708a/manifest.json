@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "capturedOn": "2026-09-04",
+  "source": {
+    "url": "https://merciful-iguanodon-c69.notion.site/RM8708A-Supercapacitor-controller-307fa7e594d880509271ff5a7605a5f0",
+    "pageId": "307fa7e5-94d8-8050-9271-ff5a7605a5f0",
+    "createdUtc": "2026-02-14T17:32:57.590Z",
+    "lastEditedUtc": "2026-03-30T19:05:27.142Z",
+    "blockCount": 77
+  },
+  "assets": [
+    {
+      "path": "assets/pinout.png",
+      "kind": "notion-attachment",
+      "blockId": "307fa7e5-94d8-80c3-b2e2-d56e7b643ed2",
+      "sourceName": "image.png",
+      "bytes": 2149772,
+      "sha256": "83bf99e2ebc65892a237f764bfd80ccf5ecca97b81163c97ba7b83331e0e1757"
+    },
+    {
+      "path": "assets/example-wiring-diagram.png",
+      "kind": "notion-attachment",
+      "blockId": "333fa7e5-94d8-8074-8f72-ff397cf55881",
+      "sourceName": "Untitled Diagram.drawio (4).png",
+      "bytes": 405039,
+      "sha256": "fcd077051eaca9454e4eb26dccbeac68250453cf42692058791c7111b37cc18a"
+    },
+    {
+      "path": "assets/mechanical-placeholder.png",
+      "kind": "notion-attachment",
+      "blockId": "307fa7e5-94d8-80ef-83b6-c5328231d7fd",
+      "sourceName": "image.png",
+      "bytes": 273123,
+      "sha256": "215c207cdbbbc8f3ced96b690dad9657da329ae211c486232c68501e2c373caa"
+    },
+    {
+      "path": "assets/hardware-pcba.png",
+      "kind": "notion-attachment",
+      "blockId": "307fa7e5-94d8-8070-b88a-d6d65f7355aa",
+      "sourceName": "image.png",
+      "bytes": 471733,
+      "sha256": "10d94fc197a3e3da944ca75c4c73cf18a15931460145940d5a6ecf21c7be0495"
+    },
+    {
+      "path": "assets/test.elf",
+      "kind": "notion-attachment",
+      "blockId": "307fa7e5-94d8-8055-b9be-f1b86be8653f",
+      "sourceName": "test.bin",
+      "displayName": "test.elf",
+      "bytes": 320100,
+      "sha256": "76608561fa820c54795461f1758b754060988077701ee7906df27aa731ca659d"
+    },
+    {
+      "path": "assets/stm32-option-bytes.png",
+      "kind": "notion-attachment",
+      "blockId": "307fa7e5-94d8-8044-a479-efcb10ab3b12",
+      "sourceName": "image.png",
+      "bytes": 140021,
+      "sha256": "2de9f6ac4988dcdd9fd1eda490764d1ef4f84c167da53743c08ef4c57379cdc8"
+    },
+    {
+      "path": "assets/dac-calibration.png",
+      "kind": "notion-attachment",
+      "blockId": "319fa7e5-94d8-80c5-b4f8-e529f06e96c1",
+      "sourceName": "image.png",
+      "bytes": 113363,
+      "sha256": "f2d6cf7777f327d6b313e4529daaf97034ff21f278b001b7892bc73525fbbc8a"
+    },
+    {
+      "path": "assets/social-preview.png",
+      "kind": "notion-page-metadata",
+      "sourceName": "SocialMediaPreviewImage.png",
+      "bytes": 44495,
+      "sha256": "ab3f847286869f86835925a1b78403a747b0691f04a276102a6394e4a9e1b6aa"
+    },
+    {
+      "path": "assets/ti-ssztcv2.pdf",
+      "kind": "external-embed",
+      "sourceUrl": "https://www.ti.com/lit/ta/ssztcv2/ssztcv2.pdf",
+      "bytes": 734028,
+      "sha256": "8072f45bdcd14af1090686a3e0dae31bc4840e24ca07eb4cd33f3bf91a2b82b0"
+    },
+    {
+      "path": "assets/ti-snva364a.pdf",
+      "kind": "external-embed",
+      "sourceUrl": "https://www.ti.com/lit/an/snva364a/snva364a.pdf",
+      "bytes": 2763588,
+      "sha256": "f043db4fc6be32dd84c35a2f152f96c4ff23eeb4ef69ad790d4d7cdafcb597f5"
+    }
+  ]
+}
