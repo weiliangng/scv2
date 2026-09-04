@@ -15,7 +15,9 @@ Use `status` and inspect the physical `Switch enable output (SWEN) pin` line.
 
 Not as separate applications. Only one program can normally own a COM port. Close or disconnect the dashboard before opening PuTTY or another terminal.
 
-The dashboard's built-in USB CLI tab temporarily pauses its own telemetry mirror while executing a command, allowing both behaviors within that single application.
+The separate dashboard application provides an integrated CLI transaction for
+this use case; see its
+[setup and operation guide](https://github.com/weiliangng/scv2-dashboard/blob/main/docs/SETUP.md).
 
 ## Where is the connector pinout?
 

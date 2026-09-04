@@ -21,15 +21,13 @@ Start diagnosis with observation. Do not change control or calibration until the
 4. Record the complete output before changing state.
 5. Check faults, undervoltage lockout, stale inputs, capacitor-voltage lockout, direction, and switching timers.
 
-## Live dashboard
+## Graphical telemetry
 
-The dashboard accepts the 69-field `T1` telemetry record over:
-
-- Board USB CDC
-- External USART1 at 921600 baud
-- UDP from an external UART bridge
-
-Use [Telemetry transports](../../api/telemetry/) for connection details. The downloadable Windows executable bundles Python, Qt, and pyserial and does not require a development environment on the target PC.
+SCV2 provides the `T1` stream over board USB CDC and external USART1. Use
+[Telemetry transports](../../api/telemetry/) for the firmware-owned interface
+details. The separate
+[dashboard repository](https://github.com/weiliangng/scv2-dashboard) owns the
+desktop application, packaging, connection workflow, and troubleshooting.
 
 ## Switch enable remains off
 
@@ -60,6 +58,6 @@ A complete capacity-test procedure and pass criteria are not yet published. Do n
 
 ## Further reference
 
-- [Dashboard setup and operation](https://github.com/weiliangng/scv2-dashboard)
+- [Dashboard setup and operation](https://github.com/weiliangng/scv2-dashboard/blob/main/docs/SETUP.md)
 - [Complete USB CLI guide](https://github.com/weiliangng/scv2/blob/main/CLI_GUIDE.md)
 - [Advanced firmware and telemetry reference](https://github.com/weiliangng/scv2/blob/main/agent.md)

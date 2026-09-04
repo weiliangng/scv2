@@ -5,25 +5,25 @@ sidebar:
   order: 4
 ---
 
-The dashboard displays the current 69-field `T1` CSV telemetry record. SCV2 can deliver that stream through USB CDC or its dedicated telemetry UART; an external bridge can forward the UART stream over UDP.
+SCV2 emits the current 69-field `T1` CSV telemetry record through USB CDC or
+its dedicated telemetry UART. Desktop display and UDP bridge behavior are
+owned by their separate repositories.
 
 ## Transport matrix
 
 | Transport | Settings | Behavior |
 |---|---|---|
-| Board USB CDC | COM port; displayed baud does not affect USB | Dashboard enables and disables the USB telemetry mirror |
+| Board USB CDC | COM port; displayed baud does not affect USB | Host controls the optional mirror with the `telemetry` CLI command |
 | External UART | USART1 TX on PA9, 921600 8-N-1, 3.3 V logic | Always-on transmit stream; does not accept CLI commands |
-| UDP bridge | UDP port 14551 by convention | External bridge forwards raw UART bytes; dashboard only listens |
+| UDP bridge | External project configuration | Bridge behavior is not defined by SCV2 firmware |
 
 ## USB CDC
 
-1. Connect the board using a USB data cable.
-2. Select **USB serial** in the dashboard.
-3. Select the board's COM port.
-4. Keep **Enable USB telemetry while connected** checked.
-5. Select **Connect**.
-
-The dashboard sends `telemetry on` when it connects and `telemetry off` when it disconnects.
+Connect the board using a USB data cable. The firmware's telemetry mirror is
+controlled with `telemetry on`, `telemetry off`, and `telemetry toggle`; see
+[USB CLI](../usb-cli/) for command behavior. Application-specific connection
+steps belong to the
+[dashboard setup guide](https://github.com/weiliangng/scv2-dashboard/blob/main/docs/SETUP.md).
 
 ## External USART1 receiver
 
@@ -35,11 +35,13 @@ The dashboard sends `telemetry on` when it connects and `telemetry off` when it 
 
 ## UDP bridge
 
-Configure the bridge to forward raw UART telemetry to UDP port `14551` on the dashboard PC. The dashboard does not discover the bridge, send replies, or require datagram boundaries to align with `T1` records.
+An external bridge may forward the USART1 stream over UDP. Its network and
+forwarding behavior are not controlled by this firmware repository; consult
+the bridge and dashboard repositories.
 
 :::note[One owner per COM port]
 The dashboard, PuTTY, CLion's serial monitor, and other serial tools cannot normally share the same COM port. Disconnect one before opening another.
 :::
 
-For development setup, executable packaging, and transport troubleshooting,
-see the canonical [dashboard repository](https://github.com/weiliangng/scv2-dashboard).
+For desktop setup, executable packaging, and application troubleshooting, see
+the canonical [dashboard setup guide](https://github.com/weiliangng/scv2-dashboard/blob/main/docs/SETUP.md).
