@@ -209,44 +209,40 @@ The capacitor-health check compares energy and voltage across non-overlapping on
 
 In external mode, fresh UART power plus energy wins; otherwise fresh CAN is used; otherwise the controller has no source. In manual mode, the newer pushbutton or manual-SWEN mailbox wins. Faults and UVLO override normal operation. Valid external energy adjusts `pset_W`; converter direction and Vcap lockout determine whether that source may enable SWEN. Use `swen_out` to verify what hardware actually received.
 
-### Local dashboard
+### External dashboard
 
-`tools/scv2_dashboard.py` is the local viewer for this exact `T1` schema. It consumes only complete records with all 69 columns and ignores ordinary CLI output. Its field order is intentionally tied to this document.
+The dashboard is maintained and released independently in
+[`weiliangng/scv2-dashboard`](https://github.com/weiliangng/scv2-dashboard).
+That repository owns the desktop source, dependencies, Windows packaging,
+usage documentation, CI, and dashboard releases. This firmware repository owns
+the `T1` producer and its field semantics; coordinate changes to the number,
+order, units, or meaning of `T1` fields with the dashboard repository.
 
-For fresh Python installation, dependency setup, connection instructions, and troubleshooting, follow [`DASHBOARD_SETUP.md`](DASHBOARD_SETUP.md).
+The firmware provides an optional USB CDC `T1` mirror controlled by the
+`telemetry on`, `telemetry off`, and `telemetry toggle` CLI commands. It also
+provides the always-on USART1 TX telemetry stream at 921600 baud. Dashboard
+connection handling and bridge network configuration are documented in their
+respective repositories. CLI commands can mutate hardware, so use the same
+safe-bench constraints as a serial terminal.
 
-When connected through the board's USB CDC port with **Enable USB telemetry while connected** selected, the dashboard's **USB CLI** tab can send one command at a time. It sends `telemetry off`, waits for the `scv2> ` prompt, sends the entered command, waits for that command's prompt, then sends `telemetry on`; the response is shown in the tab. This is unavailable for UDP and for serial links with USB telemetry disabled, including the receive-only PA9 USB-UART setup. CLI commands can mutate hardware, so use the same safe-bench constraints as a serial terminal.
+### Firmware releases
 
-### Portable Windows executable
+To publish firmware, push an annotated tag matching `firmware-v*`, for example
+`firmware-v1.0.0`. `.github/workflows/firmware-release.yml` builds MinSizeRel
+firmware on Linux with pinned Arm GNU Toolchain 14.3.Rel1 and publishes only
+`SCV2_Firmware.elf`, `.bin`, `.hex`, `.map`, build metadata, and firmware
+checksums. `SCV2_Firmware.elf` is the file for STM32CubeProgrammer.
 
-`SCV2 Dashboard.exe` is the single-file Windows distribution, published as a GitHub Release asset rather than committed to the repository. It bundles Python, Qt, and pyserial, so a brand-new supported 64-bit Windows installation can run it without Python, a virtual environment, Qt, or CMake. It is an unsigned in-house executable: follow the organisation-approved Windows SmartScreen review path before allowing it to run.
-
-When changing `tools/scv2_dashboard.py` or its dependencies, rebuild locally before testing or publishing a release. With the project `.venv` installed as described in `DASHBOARD_SETUP.md`, run:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-dashboard-exe.ps1
-```
-
-This checks for PyInstaller without importing it, installs PyInstaller in the project virtual environment if needed, creates the one-file executable at `SCV2 Dashboard.exe`, then runs `SCV2 Dashboard.exe --self-test`. Later rebuilds work offline once PyInstaller is installed. `-ExecutionPolicy Bypass` applies only to that one PowerShell process; it does not change the PC policy. Do not commit the executable: it is ignored and release assets are kept outside Git history.
-
-To publish an SCV2 version, commit and push the source/documentation changes, then push an annotated tag matching `dashboard-v*`, for example `dashboard-v1.0.0`. `.github/workflows/dashboard-release.yml` creates the release only after two clean builds pass: the dashboard on 64-bit Windows and the MinSizeRel firmware on Linux with pinned Arm GNU Toolchain 14.3.Rel1. It uploads `SCV2 Dashboard.exe` plus its checksum, and `SCV2_Firmware.elf`, `.bin`, `.hex`, `.map`, build metadata, and firmware checksums. `SCV2_Firmware.elf` is the file for STM32CubeProgrammer. A rerun replaces only assets on the same release tag; versioned releases retain previous distributable builds without bloating repository history. Do not alter the workflow's `contents: write` permission: it is required to create the release and attach assets.
-
-To verify that a release ELF matches a local build, run `Get-FileHash -LiteralPath .\build\MinSizeRel\test.elf -Algorithm SHA256` locally and compare it with `SCV2_Firmware.sha256` from the release (or hash the downloaded `SCV2_Firmware.elf` in the same way). Equal SHA-256 values mean the two ELF files are byte-for-byte identical. The release's `SCV2_Firmware.build.txt` records the compiler and build-tool versions to diagnose a mismatch.
-
-- Continuous fields are shown as live current-value cards; the dashboard does not retain or graph historical samples. Invalid CAN, UART, and manual command values are greyed out rather than shown as zero.
-- Validity and freshness fields are displayed as `VALID`/`INVALID` and `FRESH`/`STALE`; invalid or stale values are grey.
-- Binary fields are semantic state cards such as `ON`/`OFF`, `SAFE`/`UNSAFE`, and `UP`/`DOWN`.
-- N-ary resolver values are decoded: for example, `decision=5` is shown as `UART` and `decision=1` as `IDLE / UVLO`.
-
-Start it by double-clicking `Start SCV2 Dashboard.cmd`, or run:
+To verify that a release ELF matches a local build, run:
 
 ```powershell
-.venv\Scripts\python.exe tools\scv2_dashboard.py --port COM8
+Get-FileHash -LiteralPath .\build\MinSizeRel\test.elf -Algorithm SHA256
 ```
 
-For USB CDC, the dashboard enables `telemetry on` when it connects and sends `telemetry off` before disconnecting. For an external USB-UART receiver connected to PA9, select 921600 baud and uncheck "Enable USB telemetry while connected"; USART1 is already streaming.
-
-For the ESP32 UART bridge, select **UDP listener**, leave **UDP port** at `14551` for UART1, and connect. The dashboard binds that local port and only receives raw datagrams; it does not send discovery traffic or expect a reply from `192.168.4.1`. Datagram boundaries are not treated as telemetry-message boundaries: received bytes are buffered until a newline completes a record. Use `--transport udp --udp-port 14551` to open in that mode. Use `--demo` to inspect the display without a board.
+Compare it with `SCV2_Firmware.sha256` from the release. Equal SHA-256 values
+mean the two ELF files are byte-for-byte identical. The release's
+`SCV2_Firmware.build.txt` records the compiler and build-tool versions to
+diagnose a mismatch.
 
 ## CAN five-byte command test guide
 
